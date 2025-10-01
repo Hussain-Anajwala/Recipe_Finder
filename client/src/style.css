@@ -1,0 +1,209 @@
+/* --- UPGRADED STYLE.CSS --- */
+
+/* Reset */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Base Style with new Font and Colors */
+body {
+  font-family: 'Poppins', sans-serif; /* Modern Font */
+  background-color: #f8f9fa; /* Lighter background */
+  color: #343a40;
+  line-height: 1.6;
+}
+
+/* Header */
+header {
+  background: linear-gradient(135deg, #6f42c1, #4a148c);
+  padding: 2rem 1rem;
+  text-align: center;
+  color: #fff;
+  border-radius: 0 0 20px 20px;
+  margin-bottom: 3rem;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+header h1 {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+  font-weight: 700;
+}
+
+/* Navigation */
+nav a {
+  color: #e0cffc;
+  margin: 0 1rem;
+  text-decoration: none;
+  font-weight: 400;
+  transition: color 0.3s ease;
+}
+
+nav a:hover {
+  color: #fff;
+}
+
+/* Main Container */
+main {
+  max-width: 1200px;
+  margin: auto;
+  padding: 1rem;
+}
+
+main h2 {
+  text-align: center;
+  font-size: 2rem;
+  margin-bottom: 2rem;
+  color: #4a148c;
+}
+
+/* --- ENHANCED RECIPE CARD STYLING --- */
+.recipe-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 2rem;
+}
+
+.recipe-card {
+  background: #ffffff;
+  border-radius: 15px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.recipe-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 12px 40px rgba(74, 20, 140, 0.15);
+}
+
+.recipe-card h2 {
+  font-size: 1.5rem;
+  color: #fff;
+  background-color: #6f42c1;
+  padding: 1rem 1.5rem;
+  text-align: left;
+  margin: 0;
+}
+
+.recipe-card .ingredients-title {
+  padding: 0 1.5rem;
+  margin-top: 1rem;
+  font-weight: 600;
+  color: #6c757d;
+}
+
+.recipe-card ul {
+  list-style: none;
+  padding: 0.5rem 1.5rem;
+}
+
+.recipe-card ul li {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #e9ecef;
+}
+.recipe-card ul li:last-child {
+  border-bottom: none;
+}
+
+
+/* --- NEW NUTRITION SECTION STYLING --- */
+.nutrition-info {
+  margin-top: auto; /* Pushes nutrition to the bottom */
+  padding: 1.5rem;
+  background-color: #f8f9fa;
+  border-top: 1px solid #e9ecef;
+}
+
+.nutrition-info h3 {
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+  color: #4a148c;
+  text-align: center;
+}
+
+.nutrition-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  text-align: center;
+}
+
+.nutrition-item span {
+  font-size: 0.9rem;
+  color: #6c757d;
+  display: block;
+}
+
+.nutrition-item strong {
+  font-size: 1.2rem;
+  color: #343a40;
+}
+
+
+/* --- IMPROVED FORM STYLING --- */
+form {
+  max-width: 500px;
+  margin: 2rem auto;
+  background: #fff;
+  padding: 2.5rem;
+  border-radius: 15px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+}
+
+form label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: #495057;
+}
+
+form input,
+form textarea {
+  width: 100%;
+  padding: 0.8rem 1rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid #ced4da;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-family: 'Poppins', sans-serif;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+form input:focus,
+form textarea:focus {
+  border-color: #6f42c1;
+  box-shadow: 0 0 0 3px rgba(111, 66, 193, 0.2);
+  outline: none;
+}
+
+form button {
+  background: linear-gradient(135deg, #8e44ad, #6f42c1);
+  color: white;
+  padding: 0.8rem 1.5rem;
+  border: none;
+  width: 100%;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.3s ease;
+}
+
+form button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.footer-links {
+  text-align: center;
+  margin-top: 2rem;
+}
+
+.footer-links a {
+  color: #6f42c1;
+}

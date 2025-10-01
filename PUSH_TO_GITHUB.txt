@@ -1,0 +1,58 @@
+# ========================================
+# QUICK GITHUB PUSH COMMANDS
+# Copy and paste these commands one by one
+# ========================================
+
+# 1. Navigate to project directory
+cd c:\Users\husai\OneDrive\Desktop\WDL_miniproject\Recipe_Finder
+
+# 2. Check if .env is ignored (IMPORTANT!)
+git status
+
+# 3. If you see server/.env in the list, STOP and run:
+git rm --cached server/.env
+git add .gitignore
+git commit -m "Remove .env from tracking"
+
+# 4. If .env is NOT in the list, proceed:
+git add .
+git commit -m "Initial commit: Recipe Finder MERN application"
+
+# 5. Create repository on GitHub first, then:
+# Replace YOUR_USERNAME with your actual GitHub username
+git remote add origin https://github.com/YOUR_USERNAME/recipe-finder.git
+
+# 6. Push to GitHub
+git branch -M main
+git push -u origin main
+
+# ========================================
+# VERIFICATION
+# ========================================
+
+# Check what files are tracked by git:
+git ls-files | Select-String ".env"
+
+# If this shows server/.env, you need to remove it!
+# Otherwise, you're good to go!
+
+# ========================================
+# IF YOU ALREADY PUSHED SECRETS
+# ========================================
+
+# 1. Change all secrets in your .env file immediately
+# 2. Regenerate API keys
+# 3. Clean git history:
+git filter-branch --force --index-filter "git rm --cached --ignore-unmatch server/.env" --prune-empty --tag-name-filter cat -- --all
+git push origin --force --all
+
+# ========================================
+# FUTURE COMMITS
+# ========================================
+
+# After making changes:
+git add .
+git commit -m "Your descriptive commit message"
+git push
+
+# ========================================
