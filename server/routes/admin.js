@@ -9,6 +9,7 @@ import {
   rejectRecipe,
   getAllUsers,
   deleteUser,
+  editRecipe,
   deleteRecipe
 } from '../controllers/adminController.js';
 import { protect, adminOnly } from '../middleware/authMiddleware.js';
@@ -38,6 +39,7 @@ router.get('/users', getAllUsers);
 router.delete('/users/:id', deleteUser);
 
 // Recipe management
+router.put('/recipes/:id', editRecipe);
 router.delete('/recipes/:id', deleteRecipe);
 
 export default router;

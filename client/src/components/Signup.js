@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { toast } from '../utils/toast';
 
 function Signup() {
   const [formData, setFormData] = useState({
@@ -22,13 +23,14 @@ function Signup() {
       const response = await axios.post('http://localhost:5000/api/auth/register', formData);
       
       console.log('Signup successful:', response.data);
-      alert('Registration successful! Please log in.');
+      toast.success('Registration successful! Please log in.');
       
       navigate('/login');
 
     } catch (error) {
       console.error('Signup error:', error.response ? error.response.data : error.message);
-      alert(`Registration failed: ${error.response ? error.response.data.message : 'Server error'}`);
+      const errorMessage = error.response?.data?.message || 'Server error. Please try again.';
+      toast.error(`Registration failed: ${errorMessage}`);
     }
   };
 

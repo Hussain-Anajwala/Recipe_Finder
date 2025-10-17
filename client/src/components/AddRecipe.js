@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { toast } from '../utils/toast';
+import LoadingSpinner from './LoadingSpinner';
 
 function AddRecipe() {
   const [formData, setFormData] = useState({
@@ -15,6 +17,7 @@ function AddRecipe() {
     instructions: '',
     image: ''
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -26,11 +29,12 @@ function AddRecipe() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsSubmitting(true);
 
     const token = localStorage.getItem('token');
 
     if (!token) {
-      alert('You must be logged in to create a recipe.');
+      toast.error('You must be logged in to create a recipe.');
       navigate('/login');
       return;
     }
@@ -66,11 +70,14 @@ function AddRecipe() {
       );
 
       console.log('Recipe created successfully:', response.data);
-      alert('Recipe submitted for review! You can track its status in "My Recipes".');
+      toast.success('Recipe submitted for review! You can track its status in "My Recipes".');
       navigate('/my-recipes');
     } catch (error) {
       console.error('Error creating recipe:', error.response ? error.response.data : error.message);
-      alert(`Error: ${error.response ? error.response.data.message : 'Could not create recipe'}`);
+      const errorMessage = error.response?.data?.message || 'Could not create recipe. Please try again.';
+      toast.error(`Error: ${errorMessage}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -234,19 +241,25 @@ function AddRecipe() {
 
         <button 
           type="submit"
+          disabled={isSubmitting}
           style={{ 
             width: '100%', 
             padding: '14px', 
-            background: '#27ae60', 
+            background: isSubmitting ? '#95a5a6' : '#27ae60', 
             color: 'white', 
             border: 'none', 
             borderRadius: '6px', 
             fontSize: '18px', 
             fontWeight: 'bold', 
-            cursor: 'pointer' 
+            cursor: isSubmitting ? 'not-allowed' : 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '10px'
           }}
         >
-          Submit Recipe for Review
+          {isSubmitting && <LoadingSpinner size="small" color="white" />}
+          {isSubmitting ? 'Submitting Recipe...' : 'Submit Recipe for Review'}
         </button>
       </form>
     </div>

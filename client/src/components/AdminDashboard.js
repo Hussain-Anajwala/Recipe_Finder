@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
+import { toast } from '../utils/toast';
 
 function AdminDashboard() {
   const [stats, setStats] = useState(null);
@@ -10,6 +11,20 @@ function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [selectedRecipe, setSelectedRecipe] = useState(null);
   const [adminNotes, setAdminNotes] = useState('');
+  const [editingRecipe, setEditingRecipe] = useState(null);
+  const [editForm, setEditForm] = useState({
+    title: '',
+    description: '',
+    category: '',
+    prepTime: '',
+    cookTime: '',
+    servings: '',
+    difficulty: '',
+    ingredients: [],
+    instructions: [],
+    image: '',
+    status: ''
+  });
   const navigate = useNavigate();
   const { isAdmin } = useContext(AuthContext);
 
@@ -65,20 +80,20 @@ function AdminDashboard() {
         { adminNotes },
         getAuthConfig()
       );
-      alert('Recipe approved successfully!');
+      toast.success('Recipe approved successfully!');
       setAdminNotes('');
       setSelectedRecipe(null);
       fetchStats();
       fetchSubmissions(filter);
     } catch (error) {
       console.error('Error approving recipe:', error);
-      alert('Failed to approve recipe');
+      toast.error('Failed to approve recipe');
     }
   };
 
   const handleReject = async (recipeId) => {
     if (!adminNotes.trim()) {
-      alert('Please provide a reason for rejection in the admin notes.');
+      toast.warning('Please provide a reason for rejection in the admin notes.');
       return;
     }
     
@@ -88,14 +103,14 @@ function AdminDashboard() {
         { adminNotes },
         getAuthConfig()
       );
-      alert('Recipe rejected.');
+      toast.success('Recipe rejected.');
       setAdminNotes('');
       setSelectedRecipe(null);
       fetchStats();
       fetchSubmissions(filter);
     } catch (error) {
       console.error('Error rejecting recipe:', error);
-      alert('Failed to reject recipe');
+      toast.error('Failed to reject recipe');
     }
   };
 
@@ -106,13 +121,103 @@ function AdminDashboard() {
 
     try {
       await axios.delete(`http://localhost:5000/api/admin/recipes/${recipeId}`, getAuthConfig());
-      alert('Recipe deleted successfully!');
+      toast.success('Recipe deleted successfully!');
       fetchStats();
       fetchSubmissions(filter);
     } catch (error) {
       console.error('Error deleting recipe:', error);
-      alert('Failed to delete recipe');
+      toast.error('Failed to delete recipe');
     }
+  };
+
+  const handleEditRecipe = (recipe) => {
+    setEditingRecipe(recipe);
+    setEditForm({
+      title: recipe.title,
+      description: recipe.description,
+      category: recipe.category,
+      prepTime: recipe.prepTime,
+      cookTime: recipe.cookTime,
+      servings: recipe.servings,
+      difficulty: recipe.difficulty,
+      ingredients: recipe.ingredients,
+      instructions: recipe.instructions,
+      image: recipe.image || '',
+      status: recipe.status
+    });
+  };
+
+  const handleUpdateRecipe = async () => {
+    try {
+      console.log('Updating recipe:', editingRecipe._id);
+      console.log('Edit form data:', editForm);
+      
+      const response = await axios.put(
+        `http://localhost:5000/api/admin/recipes/${editingRecipe._id}`,
+        editForm,
+        getAuthConfig()
+      );
+      
+      console.log('Update response:', response.data);
+      toast.success('Recipe updated successfully!');
+      setEditingRecipe(null);
+      setEditForm({
+        title: '',
+        description: '',
+        category: '',
+        prepTime: '',
+        cookTime: '',
+        servings: '',
+        difficulty: '',
+        ingredients: [],
+        instructions: [],
+        image: '',
+        status: ''
+      });
+      fetchStats();
+      fetchSubmissions(filter);
+    } catch (error) {
+      console.error('Error updating recipe:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      toast.error(`Failed to update recipe: ${error.response?.data?.message || error.message}`);
+    }
+  };
+
+  const addIngredient = () => {
+    setEditForm({
+      ...editForm,
+      ingredients: [...editForm.ingredients, '']
+    });
+  };
+
+  const updateIngredient = (index, value) => {
+    const newIngredients = [...editForm.ingredients];
+    newIngredients[index] = value;
+    setEditForm({ ...editForm, ingredients: newIngredients });
+  };
+
+  const removeIngredient = (index) => {
+    const newIngredients = editForm.ingredients.filter((_, i) => i !== index);
+    setEditForm({ ...editForm, ingredients: newIngredients });
+  };
+
+  const addInstruction = () => {
+    setEditForm({
+      ...editForm,
+      instructions: [...editForm.instructions, '']
+    });
+  };
+
+  const updateInstruction = (index, value) => {
+    const newInstructions = [...editForm.instructions];
+    newInstructions[index] = value;
+    setEditForm({ ...editForm, instructions: newInstructions });
+  };
+
+  const removeInstruction = (index) => {
+    const newInstructions = editForm.instructions.filter((_, i) => i !== index);
+    setEditForm({ ...editForm, instructions: newInstructions });
   };
 
   const StatCard = ({ title, value, color }) => (
@@ -247,7 +352,21 @@ function AdminDashboard() {
               )}
 
               {(recipe.status === 'approved' || recipe.status === 'rejected') && (
-                <div style={{ marginTop: '20px', borderTop: '1px solid #ecf0f1', paddingTop: '20px' }}>
+                <div style={{ marginTop: '20px', borderTop: '1px solid #ecf0f1', paddingTop: '20px', display: 'flex', gap: '10px' }}>
+                  <button
+                    onClick={() => handleEditRecipe(recipe)}
+                    style={{
+                      padding: '10px 20px',
+                      background: '#3498db',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    ✏️ Edit Recipe
+                  </button>
                   <button
                     onClick={() => handleDeleteRecipe(recipe._id, recipe.title)}
                     style={{
@@ -350,6 +469,361 @@ function AdminDashboard() {
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Edit Recipe Modal */}
+      {editingRecipe && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.7)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '12px',
+            maxWidth: '800px',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            padding: '40px',
+            position: 'relative',
+            width: '100%'
+          }}>
+            <button
+              onClick={() => setEditingRecipe(null)}
+              style={{
+                position: 'absolute',
+                top: '20px',
+                right: '20px',
+                background: '#e74c3c',
+                color: 'white',
+                border: 'none',
+                borderRadius: '50%',
+                width: '40px',
+                height: '40px',
+                fontSize: '20px',
+                cursor: 'pointer',
+                fontWeight: 'bold'
+              }}
+            >
+              ×
+            </button>
+
+            <h2 style={{ marginTop: 0, marginBottom: '30px' }}>Edit Recipe</h2>
+
+            <div style={{ display: 'grid', gap: '20px' }}>
+              {/* Basic Info */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Title</label>
+                  <input
+                    type="text"
+                    value={editForm.title}
+                    onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      border: '1px solid #ddd',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Category</label>
+                  <select
+                    value={editForm.category}
+                    onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      border: '1px solid #ddd',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                  >
+                    <option value="Breakfast">Breakfast</option>
+                    <option value="Lunch">Lunch</option>
+                    <option value="Dinner">Dinner</option>
+                    <option value="Dessert">Dessert</option>
+                    <option value="Snack">Snack</option>
+                    <option value="Salad">Salad</option>
+                    <option value="Soup">Soup</option>
+                    <option value="Beverage">Beverage</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Description</label>
+                <textarea
+                  value={editForm.description}
+                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    border: '1px solid #ddd',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    minHeight: '80px'
+                  }}
+                />
+              </div>
+
+              {/* Time and Servings */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '20px' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Prep Time (min)</label>
+                  <input
+                    type="number"
+                    value={editForm.prepTime}
+                    onChange={(e) => setEditForm({ ...editForm, prepTime: parseInt(e.target.value) })}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      border: '1px solid #ddd',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Cook Time (min)</label>
+                  <input
+                    type="number"
+                    value={editForm.cookTime}
+                    onChange={(e) => setEditForm({ ...editForm, cookTime: parseInt(e.target.value) })}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      border: '1px solid #ddd',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Servings</label>
+                  <input
+                    type="number"
+                    value={editForm.servings}
+                    onChange={(e) => setEditForm({ ...editForm, servings: parseInt(e.target.value) })}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      border: '1px solid #ddd',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Difficulty</label>
+                  <select
+                    value={editForm.difficulty}
+                    onChange={(e) => setEditForm({ ...editForm, difficulty: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      border: '1px solid #ddd',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                  >
+                    <option value="Easy">Easy</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Hard">Hard</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Status */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Status</label>
+                <select
+                  value={editForm.status}
+                  onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    border: '1px solid #ddd',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                >
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+              </div>
+
+              {/* Image URL */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Image URL</label>
+                <input
+                  type="url"
+                  value={editForm.image}
+                  onChange={(e) => setEditForm({ ...editForm, image: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    border: '1px solid #ddd',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+
+              {/* Ingredients */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <label style={{ fontWeight: 'bold' }}>Ingredients</label>
+                  <button
+                    type="button"
+                    onClick={addIngredient}
+                    style={{
+                      padding: '5px 10px',
+                      background: '#27ae60',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '12px'
+                    }}
+                  >
+                    + Add Ingredient
+                  </button>
+                </div>
+                {editForm.ingredients.map((ingredient, index) => (
+                  <div key={index} style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                    <input
+                      type="text"
+                      value={ingredient}
+                      onChange={(e) => updateIngredient(index, e.target.value)}
+                      style={{
+                        flex: 1,
+                        padding: '8px',
+                        border: '1px solid #ddd',
+                        borderRadius: '4px',
+                        fontSize: '14px'
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeIngredient(index)}
+                      style={{
+                        padding: '8px 12px',
+                        background: '#e74c3c',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Instructions */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <label style={{ fontWeight: 'bold' }}>Instructions</label>
+                  <button
+                    type="button"
+                    onClick={addInstruction}
+                    style={{
+                      padding: '5px 10px',
+                      background: '#27ae60',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '12px'
+                    }}
+                  >
+                    + Add Step
+                  </button>
+                </div>
+                {editForm.instructions.map((instruction, index) => (
+                  <div key={index} style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                    <span style={{ minWidth: '30px', paddingTop: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+                      {index + 1}.
+                    </span>
+                    <textarea
+                      value={instruction}
+                      onChange={(e) => updateInstruction(index, e.target.value)}
+                      style={{
+                        flex: 1,
+                        padding: '8px',
+                        border: '1px solid #ddd',
+                        borderRadius: '4px',
+                        fontSize: '14px',
+                        minHeight: '60px'
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeInstruction(index)}
+                      style={{
+                        padding: '8px 12px',
+                        background: '#e74c3c',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', gap: '15px', marginTop: '30px' }}>
+                <button
+                  onClick={handleUpdateRecipe}
+                  style={{
+                    padding: '12px 24px',
+                    background: '#27ae60',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    fontSize: '16px'
+                  }}
+                >
+                  💾 Update Recipe
+                </button>
+                <button
+                  onClick={() => setEditingRecipe(null)}
+                  style={{
+                    padding: '12px 24px',
+                    background: '#95a5a6',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    fontSize: '16px'
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

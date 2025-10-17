@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { toast } from '../utils/toast';
 
 function RecipeList() {
   const [recipes, setRecipes] = useState([]);
@@ -10,9 +11,18 @@ function RecipeList() {
   const [isSearching, setIsSearching] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedDifficulty, setSelectedDifficulty] = useState('All');
+  const [showBackToTop, setShowBackToTop] = useState(false);
 
   useEffect(() => {
     fetchRecipes();
+    
+    // Add scroll listener for back to top button
+    const handleScroll = () => {
+      setShowBackToTop(window.scrollY > 300);
+    };
+    
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   const fetchRecipes = async () => {
@@ -22,7 +32,7 @@ function RecipeList() {
       setLoading(false);
     } catch (error) {
       console.error('Failed to fetch recipes:', error);
-      alert('Failed to load recipes. Please try again later.');
+      toast.error('Failed to load recipes. Please try again later.');
       setLoading(false);
     }
   };
@@ -31,7 +41,7 @@ function RecipeList() {
     e.preventDefault();
     
     if (!searchIngredients.trim()) {
-      alert('Please enter at least one ingredient');
+      toast.warning('Please enter at least one ingredient');
       return;
     }
 
@@ -42,7 +52,7 @@ function RecipeList() {
       setIsSearching(false);
     } catch (error) {
       console.error('Search error:', error);
-      alert('Search failed. Please try again.');
+      toast.error('Search failed. Please try again.');
       setIsSearching(false);
     }
   };
@@ -50,6 +60,13 @@ function RecipeList() {
   const clearSearch = () => {
     setSearchIngredients('');
     setSearchResults(null);
+  };
+
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
   };
 
   if (loading) {
@@ -387,6 +404,35 @@ function RecipeList() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Back to Top Button */}
+      {showBackToTop && (
+        <button
+          onClick={scrollToTop}
+          style={{
+            position: 'fixed',
+            bottom: '30px',
+            right: '30px',
+            width: '50px',
+            height: '50px',
+            borderRadius: '50%',
+            background: '#3498db',
+            color: 'white',
+            border: 'none',
+            fontSize: '20px',
+            cursor: 'pointer',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.3s ease'
+          }}
+          title="Back to top"
+        >
+          ↑
+        </button>
       )}
     </div>
   );

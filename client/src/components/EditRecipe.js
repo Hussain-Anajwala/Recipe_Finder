@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
+import { toast } from '../utils/toast';
 
 function EditRecipe() {
   const { id } = useParams();
@@ -95,11 +96,12 @@ function EditRecipe() {
 
     try {
       await axios.put(`http://localhost:5000/api/recipes/${id}`, recipeData, getAuthConfig());
-      alert('Recipe updated successfully!');
+      toast.success('Recipe updated successfully!');
       navigate('/my-recipes');
     } catch (error) {
       console.error('Error updating recipe:', error);
-      alert(error.response?.data?.message || 'Failed to update recipe');
+      const errorMessage = error.response?.data?.message || 'Failed to update recipe. Please try again.';
+      toast.error(errorMessage);
     }
   };
 

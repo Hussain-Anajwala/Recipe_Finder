@@ -146,6 +146,53 @@ export const deleteUser = async (req, res) => {
   }
 };
 
+// @desc    Edit any recipe (admin can edit any recipe)
+// @route   PUT /api/admin/recipes/:id
+export const editRecipe = async (req, res) => {
+  try {
+    console.log('Edit recipe request:', req.params.id);
+    console.log('Request body:', req.body);
+    
+    const recipe = await Recipe.findById(req.params.id);
+
+    if (!recipe) {
+      console.log('Recipe not found:', req.params.id);
+      return res.status(404).json({ message: 'Recipe not found' });
+    }
+
+    const { title, description, category, prepTime, cookTime, servings, difficulty, ingredients, instructions, image, status } = req.body;
+
+    // Update recipe fields
+    recipe.title = title || recipe.title;
+    recipe.description = description || recipe.description;
+    recipe.category = category || recipe.category;
+    recipe.prepTime = prepTime || recipe.prepTime;
+    recipe.cookTime = cookTime || recipe.cookTime;
+    recipe.servings = servings || recipe.servings;
+    recipe.difficulty = difficulty || recipe.difficulty;
+    recipe.ingredients = ingredients || recipe.ingredients;
+    recipe.instructions = instructions || recipe.instructions;
+    recipe.image = image || recipe.image;
+    
+    // Admin can also change status
+    if (status) {
+      recipe.status = status;
+      recipe.reviewedBy = req.user.id; // Admin who made the change
+    }
+
+    // If title or ingredients changed, recalculate nutrition
+    if (title !== recipe.title || JSON.stringify(ingredients) !== JSON.stringify(recipe.ingredients)) {
+      // You can add nutrition recalculation here if needed
+      // nutrition = await fetchNutrition(title, ingredients);
+    }
+
+    const updatedRecipe = await recipe.save();
+    res.json(updatedRecipe);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 // @desc    Delete a recipe (admin can delete any recipe)
 // @route   DELETE /api/admin/recipes/:id
 export const deleteRecipe = async (req, res) => {

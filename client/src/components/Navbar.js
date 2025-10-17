@@ -1,15 +1,30 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useContext } from "react";
+import { useContext, useState, useEffect } from "react";
 import { AuthContext } from "../context/AuthContext";
+import axios from "axios";
 
 export default function Navbar() {
   const { user, logout, isAdmin, isAuthenticated } = useContext(AuthContext);
   const navigate = useNavigate();
+  const [recipeCount, setRecipeCount] = useState(0);
 
   const handleLogout = () => {
     logout();
     navigate('/');
   };
+
+  useEffect(() => {
+    const fetchRecipeCount = async () => {
+      try {
+        const response = await axios.get('http://localhost:5000/api/recipes');
+        setRecipeCount(response.data.length);
+      } catch (error) {
+        console.error('Error fetching recipe count:', error);
+      }
+    };
+
+    fetchRecipeCount();
+  }, []);
 
   return (
     <nav style={{ padding: "15px 30px", background: "#2c3e50", color: "white", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -20,7 +35,21 @@ export default function Navbar() {
       </div>
       <div style={{ display: "flex", gap: "20px", alignItems: "center" }}>
         <Link to="/" style={{ color: "white", textDecoration: "none" }}>Home</Link>
-        <Link to="/recipes" style={{ color: "white", textDecoration: "none" }}>Recipes</Link>
+        <Link to="/recipes" style={{ color: "white", textDecoration: "none", display: "flex", alignItems: "center", gap: "5px" }}>
+          Recipes
+          {recipeCount > 0 && (
+            <span style={{ 
+              background: "#3498db", 
+              color: "white", 
+              borderRadius: "10px", 
+              padding: "2px 8px", 
+              fontSize: "12px", 
+              fontWeight: "bold" 
+            }}>
+              {recipeCount}
+            </span>
+          )}
+        </Link>
         
         {isAuthenticated() ? (
           <>
