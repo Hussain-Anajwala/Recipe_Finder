@@ -22,6 +22,22 @@ A full-stack web application for discovering, sharing, and managing recipes with
 - [Contributing](#contributing)
 - [License](#license)
 
+## 📱 Responsive Design
+
+This application is **fully responsive** and optimized for all devices:
+- 📱 **Mobile Phones** (< 768px) - Hamburger menu, single-column layouts, touch-friendly controls
+- 📱 **Tablets** (768px - 1024px) - 2-column grids, optimized spacing
+- 💻 **Desktop** (> 1024px) - Full multi-column layouts with hover effects
+
+### Responsive Features
+- ✨ **Mobile Navigation** - Hamburger menu on small screens
+- ✨ **Adaptive Grids** - Layouts automatically adjust to screen size
+- ✨ **Touch-Optimized** - All buttons and forms are mobile-friendly
+- ✨ **Readable Text** - Font sizes scale appropriately
+- ✨ **No Horizontal Scrolling** - Everything fits perfectly on all devices
+
+**See `QUICK_START_RESPONSIVE.md` for testing instructions.**
+
 ## ✨ Features
 
 ### Core Features
@@ -33,6 +49,7 @@ A full-stack web application for discovering, sharing, and managing recipes with
 - 📊 **Difficulty Levels** - Easy, Medium, Hard recipe filtering
 - 🖼️ **Image Support** - Add images to recipes via URL
 - 🥗 **Nutrition Information** - Auto-calculated using Spoonacular API
+- 📱 **Fully Responsive** - Mobile-friendly design works on all devices (Desktop, Tablet, Mobile)
 
 ### User Features
 - ✏️ **Edit Recipes** - Modify your submitted recipes

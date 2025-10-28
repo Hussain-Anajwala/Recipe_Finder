@@ -236,12 +236,40 @@ function AdminDashboard() {
   );
 
   return (
-    <div style={{ padding: '40px', maxWidth: '1400px', margin: '0 auto', background: '#f5f6fa', minHeight: '100vh' }}>
+    <div style={{ padding: '40px', maxWidth: '1400px', margin: '0 auto', background: '#f5f6fa', minHeight: '100vh' }} className="responsive-container">
+      <style>{`
+        @media screen and (max-width: 768px) {
+          .responsive-container {
+            padding: 20px 15px !important;
+          }
+
+          .stats-grid {
+            grid-template-columns: 1fr !important;
+          }
+
+          .filter-tabs {
+            flex-wrap: wrap !important;
+          }
+
+          .filter-tabs button {
+            flex: 1;
+            min-width: 120px;
+          }
+
+          .edit-form-grid {
+            grid-template-columns: 1fr !important;
+          }
+
+          .edit-form-grid-4 {
+            grid-template-columns: 1fr !important;
+          }
+        }
+      `}</style>
       <h1 style={{ marginBottom: '30px' }}>Admin Dashboard</h1>
 
       {/* Statistics Cards */}
       {stats && (
-        <div style={{ display: 'flex', gap: '20px', marginBottom: '40px', flexWrap: 'wrap' }}>
+        <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '40px' }}>
           <StatCard title="Total Users" value={stats.totalUsers} color="#3498db" />
           <StatCard title="Total Recipes" value={stats.totalRecipes} color="#9b59b6" />
           <StatCard title="Pending" value={stats.pendingRecipes} color="#f39c12" />
@@ -251,7 +279,7 @@ function AdminDashboard() {
       )}
 
       {/* Filter Tabs */}
-      <div style={{ marginBottom: '30px', display: 'flex', gap: '10px' }}>
+      <div className="filter-tabs" style={{ marginBottom: '30px', display: 'flex', gap: '10px' }}>
         {['pending', 'approved', 'rejected', 'all'].map((status) => (
           <button
             key={status}
@@ -521,7 +549,7 @@ function AdminDashboard() {
 
             <div style={{ display: 'grid', gap: '20px' }}>
               {/* Basic Info */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              <div className="edit-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                 <div>
                   <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Title</label>
                   <input
@@ -579,7 +607,7 @@ function AdminDashboard() {
               </div>
 
               {/* Time and Servings */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '20px' }}>
+              <div className="edit-form-grid-4" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '20px' }}>
                 <div>
                   <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Prep Time (min)</label>
                   <input

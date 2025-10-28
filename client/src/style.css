@@ -207,3 +207,166 @@ form button:hover {
 .footer-links a {
   color: #6f42c1;
 }
+
+/* --- RESPONSIVE DESIGN --- */
+
+/* Media Queries for Mobile Devices */
+@media screen and (max-width: 768px) {
+  /* Header adjustments */
+  header {
+    padding: 1.5rem 1rem;
+    margin-bottom: 2rem;
+  }
+
+  header h1 {
+    font-size: 1.8rem;
+  }
+
+  /* Navigation */
+  nav {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  nav a {
+    margin: 0 0.5rem;
+    font-size: 0.9rem;
+  }
+
+  /* Main container */
+  main {
+    padding: 0.5rem;
+  }
+
+  main h2 {
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  /* Recipe grid */
+  .recipe-grid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+
+  /* Recipe card */
+  .recipe-card h2 {
+    font-size: 1.2rem;
+    padding: 0.8rem 1rem;
+  }
+
+  /* Forms */
+  form {
+    padding: 1.5rem;
+    margin: 1rem auto;
+  }
+
+  form input,
+  form textarea {
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+
+  /* Nutrition grid */
+  .nutrition-grid {
+    grid-template-columns: 1fr;
+    gap: 0.8rem;
+  }
+}
+
+/* Media Queries for Small Mobile Devices */
+@media screen and (max-width: 480px) {
+  header {
+    padding: 1rem 0.5rem;
+  }
+
+  header h1 {
+    font-size: 1.5rem;
+  }
+
+  main h2 {
+    font-size: 1.3rem;
+  }
+
+  form {
+    padding: 1rem;
+  }
+
+  .recipe-card h2 {
+    font-size: 1.1rem;
+    padding: 0.7rem 0.8rem;
+  }
+}
+
+/* Tablet adjustments */
+@media screen and (min-width: 769px) and (max-width: 1024px) {
+  .recipe-grid {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+}
+
+/* Utility Classes for Responsive Design */
+.responsive-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+@media screen and (max-width: 768px) {
+  .responsive-container {
+    padding: 0.5rem;
+  }
+}
+
+.responsive-grid {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.responsive-grid-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.responsive-grid-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.responsive-grid-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+@media screen and (max-width: 1024px) {
+  .responsive-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .responsive-grid-3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media screen and (max-width: 768px) {
+  .responsive-grid-2,
+  .responsive-grid-3,
+  .responsive-grid-4 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Responsive buttons */
+.btn-responsive {
+  width: 100%;
+  max-width: 300px;
+}
+
+@media screen and (max-width: 768px) {
+  .btn-responsive {
+    max-width: 100%;
+  }
+}
+
+/* Responsive text */
+@media screen and (max-width: 768px) {
+  h1 { font-size: 1.8rem !important; }
+  h2 { font-size: 1.5rem !important; }
+  h3 { font-size: 1.2rem !important; }
+  p { font-size: 0.95rem; }
+}

@@ -82,7 +82,30 @@ function AddRecipe() {
   };
 
   return (
-    <div style={{ padding: '40px', maxWidth: '800px', margin: '0 auto' }}>
+    <div style={{ padding: '40px', maxWidth: '800px', margin: '0 auto' }} className="responsive-container">
+      <style>{`
+        @media screen and (max-width: 768px) {
+          .responsive-container {
+            padding: 20px 15px !important;
+          }
+
+          .form-grid {
+            grid-template-columns: 1fr !important;
+          }
+
+          .form-grid-3 {
+            grid-template-columns: 1fr !important;
+          }
+
+          input[type="text"],
+          input[type="number"],
+          input[type="url"],
+          textarea,
+          select {
+            font-size: 16px !important;
+          }
+        }
+      `}</style>
       <h1>Submit a New Recipe</h1>
       <p style={{ color: '#7f8c8d', marginBottom: '30px' }}>
         Your recipe will be reviewed by an admin before being published.
@@ -116,7 +139,7 @@ function AddRecipe() {
           />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+        <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
           <div>
             <label htmlFor="category" style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Category *</label>
             <select
@@ -154,7 +177,7 @@ function AddRecipe() {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+        <div className="form-grid-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px', marginBottom: '20px' }}>
           <div>
             <label htmlFor="prepTime" style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Prep Time (min) *</label>
             <input

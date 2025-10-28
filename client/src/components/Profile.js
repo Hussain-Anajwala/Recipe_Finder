@@ -112,7 +112,18 @@ function Profile() {
   }
 
   return (
-    <div style={{ padding: '40px', maxWidth: '800px', margin: '0 auto' }}>
+    <div style={{ padding: '40px', maxWidth: '800px', margin: '0 auto' }} className="responsive-container">
+      <style>{`
+        @media screen and (max-width: 768px) {
+          .responsive-container {
+            padding: 20px 15px !important;
+          }
+
+          .form-grid-2 {
+            grid-template-columns: 1fr !important;
+          }
+        }
+      `}</style>
       <h1>My Profile</h1>
       <p style={{ color: '#7f8c8d', marginBottom: '30px' }}>
         Manage your account settings and password
@@ -122,7 +133,7 @@ function Profile() {
       <div style={{ background: 'white', padding: '30px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', marginBottom: '30px' }}>
         <h2 style={{ marginTop: 0 }}>Profile Information</h2>
         <form onSubmit={handleProfileSubmit}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+          <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
             <div>
               <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>First Name</label>
               <input

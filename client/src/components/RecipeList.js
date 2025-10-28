@@ -91,11 +91,104 @@ function RecipeList() {
   const displayRecipes = getFilteredRecipes();
 
   return (
-    <div style={{ padding: '40px', maxWidth: '1200px', margin: '0 auto' }}>
+    <div style={{ padding: '40px', maxWidth: '1200px', margin: '0 auto' }} className="responsive-container">
+      <style>{`
+        @media screen and (max-width: 768px) {
+          .responsive-container {
+            padding: 20px 15px !important;
+          }
+
+          /* Search bar responsive */
+          .search-header {
+            flex-direction: column !important;
+            gap: 20px !important;
+          }
+
+          .search-title {
+            font-size: 24px !important;
+          }
+
+          .search-form {
+            width: 100% !important;
+          }
+
+          .search-input {
+            width: 100% !important;
+          }
+
+          /* Filter bar responsive */
+          .filter-bar {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 15px !important;
+          }
+
+          .filter-group {
+            width: 100%;
+          }
+
+          .filter-group select {
+            width: 100% !important;
+          }
+
+          /* Recipe grid responsive */
+          .recipe-grid {
+            grid-template-columns: 1fr !important;
+            gap: 20px !important;
+          }
+
+          /* Recipe card metadata */
+          .recipe-meta {
+            font-size: 12px !important;
+          }
+
+          /* Nutrition grid */
+          .nutrition-grid-mobile {
+            grid-template-columns: repeat(2, 1fr) !important;
+          }
+
+          /* Modal responsive */
+          .recipe-modal {
+            padding: 20px !important;
+          }
+
+          .modal-meta {
+            flex-wrap: wrap !important;
+            gap: 10px !important;
+            font-size: 13px !important;
+          }
+
+          .nutrition-grid-4 {
+            grid-template-columns: repeat(2, 1fr) !important;
+          }
+        }
+
+        @media screen and (max-width: 480px) {
+          .responsive-container {
+            padding: 15px 10px !important;
+          }
+
+          .search-title {
+            font-size: 20px !important;
+          }
+
+          .recipe-meta {
+            flex-direction: column !important;
+          }
+
+          .nutrition-grid-mobile {
+            grid-template-columns: 1fr !important;
+          }
+
+          .nutrition-grid-4 {
+            grid-template-columns: 1fr !important;
+          }
+        }
+      `}</style>
       {/* Header with Search Bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
+      <div className="search-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: '32px', color: '#2c3e50' }}>Recipe Gallery</h1>
+          <h1 className="search-title" style={{ margin: 0, fontSize: '32px', color: '#2c3e50' }}>Recipe Gallery</h1>
           {searchResults && (
             <p style={{ margin: '5px 0 0 0', color: '#70757a', fontSize: '14px' }}>
               {searchResults.totalResults} results for: <strong>{searchResults.searchedIngredients.join(', ')}</strong>
@@ -118,7 +211,7 @@ function RecipeList() {
         </div>
 
         {/* Compact Search Bar - Top Right */}
-        <form onSubmit={handleSearch}>
+        <form className="search-form" onSubmit={handleSearch}>
           <div style={{ 
             display: 'flex',
             alignItems: 'center',
@@ -136,6 +229,7 @@ function RecipeList() {
             }}>
               <span style={{ fontSize: '16px', color: '#95a5a6', marginRight: '8px' }}>🔍</span>
               <input
+                className="search-input"
                 type="text"
                 placeholder="Enter ingredients (e.g., chicken, tomato)..."
                 value={searchIngredients}
@@ -171,7 +265,7 @@ function RecipeList() {
       </div>
 
       {/* Filter Bar */}
-      <div style={{ 
+      <div className="filter-bar" style={{ 
         display: 'flex', 
         gap: '15px', 
         marginBottom: '30px', 
@@ -182,7 +276,7 @@ function RecipeList() {
       }}>
         <span style={{ fontWeight: 'bold', color: '#2c3e50' }}>Filters:</span>
         
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+        <div className="filter-group" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <label style={{ fontSize: '14px', color: '#7f8c8d' }}>Category:</label>
           <select
             value={selectedCategory}
@@ -259,7 +353,7 @@ function RecipeList() {
           <p>Be the first to submit a recipe!</p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '25px' }}>
+        <div className="recipe-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '25px' }}>
           {displayRecipes.map((recipe) => (
             <div 
               key={recipe._id} 

@@ -51,13 +51,30 @@ function Login() {
   };
 
   return (
-    <div style={{ padding: '40px', maxWidth: '500px', margin: '0 auto' }}>
+    <div style={{ padding: '40px', maxWidth: '500px', margin: '0 auto' }} className="responsive-container">
+      <style>{`
+        @media screen and (max-width: 768px) {
+          .responsive-container {
+            padding: 20px 15px !important;
+          }
+
+          .radio-group {
+            flex-direction: column !important;
+            gap: 10px !important;
+          }
+
+          input[type="email"],
+          input[type="password"] {
+            font-size: 16px !important;
+          }
+        }
+      `}</style>
       <h2>Login to Your Account</h2>
       <form onSubmit={handleSubmit} style={{ background: 'white', padding: '30px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
         
         <div style={{ marginBottom: '20px' }}>
           <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Login As:</label>
-          <div style={{ display: 'flex', gap: '20px' }}>
+          <div className="radio-group" style={{ display: 'flex', gap: '20px' }}>
             <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
               <input
                 type="radio"
