@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from '../utils/toast';
+import { BASE_URL } from '../config/api';
 
 function RecipeList() {
   const [recipes, setRecipes] = useState([]);
@@ -27,7 +28,7 @@ function RecipeList() {
 
   const fetchRecipes = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/recipes');
+      const response = await axios.get(`${BASE_URL}/api/recipes`);
       setRecipes(response.data);
       setLoading(false);
     } catch (error) {
@@ -47,7 +48,7 @@ function RecipeList() {
 
     setIsSearching(true);
     try {
-      const response = await axios.get(`http://localhost:5000/api/recipes/search?ingredients=${encodeURIComponent(searchIngredients)}`);
+      const response = await axios.get(`${BASE_URL}/api/recipes/search?ingredients=${encodeURIComponent(searchIngredients)}`);
       setSearchResults(response.data);
       setIsSearching(false);
     } catch (error) {

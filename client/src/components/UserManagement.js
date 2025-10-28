@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { BASE_URL } from '../config/api';
 
 function UserManagement() {
   const [users, setUsers] = useState([]);
@@ -21,7 +22,7 @@ function UserManagement() {
 
   const fetchUsers = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/admin/users', getAuthConfig());
+      const response = await axios.get('${BASE_URL}/api/admin/users', getAuthConfig());
       setUsers(response.data);
       setLoading(false);
     } catch (error) {
@@ -36,7 +37,7 @@ function UserManagement() {
     }
 
     try {
-      await axios.delete(`http://localhost:5000/api/admin/users/${userId}`, getAuthConfig());
+      await axios.delete(`${BASE_URL}/api/admin/users/${userId}`, getAuthConfig());
       alert('User deleted successfully!');
       fetchUsers(); // Refresh the list
     } catch (error) {

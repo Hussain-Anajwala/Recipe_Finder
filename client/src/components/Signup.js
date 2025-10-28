@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from '../utils/toast';
+import { BASE_URL } from '../config/api';
 
 function Signup() {
   const [formData, setFormData] = useState({
@@ -20,7 +21,7 @@ function Signup() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/register', formData);
+      const response = await axios.post(`${BASE_URL}/api/auth/register`, formData);
       
       console.log('Signup successful:', response.data);
       toast.success('Registration successful! Please log in.');

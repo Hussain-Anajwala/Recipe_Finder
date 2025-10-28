@@ -2,6 +2,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useContext, useState, useEffect } from "react";
 import { AuthContext } from "../context/AuthContext";
 import axios from "axios";
+import { BASE_URL } from "../config/api";
 
 export default function Navbar() {
   const { user, logout, isAdmin, isAuthenticated } = useContext(AuthContext);
@@ -18,7 +19,7 @@ export default function Navbar() {
   useEffect(() => {
     const fetchRecipeCount = async () => {
       try {
-        const response = await axios.get('http://localhost:5000/api/recipes');
+        const response = await axios.get(`${BASE_URL}/api/recipes`);
         setRecipeCount(response.data.length);
       } catch (error) {
         console.error('Error fetching recipe count:', error);

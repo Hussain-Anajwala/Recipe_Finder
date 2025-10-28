@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '../utils/toast';
 import LoadingSpinner from './LoadingSpinner';
+import { BASE_URL } from '../config/api';
 
 function AddRecipe() {
   const [formData, setFormData] = useState({
@@ -64,7 +65,7 @@ function AddRecipe() {
       };
 
       const response = await axios.post(
-        'http://localhost:5000/api/recipes/submit', 
+        `${BASE_URL}/api/recipes/submit`, 
         recipeData, 
         config
       );
