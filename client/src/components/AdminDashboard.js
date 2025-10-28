@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useContext } from 'react';
-import axios from 'axios';
+import API from '../config/api';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { toast } from '../utils/toast';
-import { BASE_URL } from '../config/api';
 
 function AdminDashboard() {
   const [stats, setStats] = useState(null);
@@ -51,7 +50,7 @@ function AdminDashboard() {
 
   const fetchStats = async () => {
     try {
-      const response = await axios.get('${BASE_URL}/api/admin/stats', getAuthConfig());
+      const response = await API.get('/api/admin/stats', getAuthConfig());
       setStats(response.data);
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -62,10 +61,10 @@ function AdminDashboard() {
     setLoading(true);
     try {
       const url = status === 'all' 
-        ? '${BASE_URL}/api/admin/submissions'
-        : `${BASE_URL}/api/admin/submissions?status=${status}`;
+        ? '/api/admin/submissions'
+        : `/api/admin/submissions?status=${status}`;
       
-      const response = await axios.get(url, getAuthConfig());
+      const response = await API.get(url, getAuthConfig());
       setSubmissions(response.data);
       setLoading(false);
     } catch (error) {
@@ -76,8 +75,8 @@ function AdminDashboard() {
 
   const handleApprove = async (recipeId) => {
     try {
-      await axios.put(
-        `${BASE_URL}/api/admin/submissions/${recipeId}/approve`,
+      await API.put(
+        `/api/admin/submissions/${recipeId}/approve`,
         { adminNotes },
         getAuthConfig()
       );
@@ -99,8 +98,8 @@ function AdminDashboard() {
     }
     
     try {
-      await axios.put(
-        `${BASE_URL}/api/admin/submissions/${recipeId}/reject`,
+      await API.put(
+        `/api/admin/submissions/${recipeId}/reject`,
         { adminNotes },
         getAuthConfig()
       );
@@ -121,7 +120,7 @@ function AdminDashboard() {
     }
 
     try {
-      await axios.delete(`${BASE_URL}/api/admin/recipes/${recipeId}`, getAuthConfig());
+      await API.delete(`/api/admin/recipes/${recipeId}`, getAuthConfig());
       toast.success('Recipe deleted successfully!');
       fetchStats();
       fetchSubmissions(filter);
@@ -153,8 +152,8 @@ function AdminDashboard() {
       console.log('Updating recipe:', editingRecipe._id);
       console.log('Edit form data:', editForm);
       
-      const response = await axios.put(
-        `${BASE_URL}/api/admin/recipes/${editingRecipe._id}`,
+      const response = await API.put(
+        `/api/admin/recipes/${editingRecipe._id}`,
         editForm,
         getAuthConfig()
       );

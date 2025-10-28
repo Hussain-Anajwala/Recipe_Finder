@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import API from '../config/api';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '../utils/toast';
 import LoadingSpinner from './LoadingSpinner';
-import { BASE_URL } from '../config/api';
 
 function AddRecipe() {
   const [formData, setFormData] = useState({
@@ -64,8 +63,8 @@ function AddRecipe() {
         image: formData.image
       };
 
-      const response = await axios.post(
-        `${BASE_URL}/api/recipes/submit`, 
+      const response = await API.post(
+        '/api/recipes/submit', 
         recipeData, 
         config
       );

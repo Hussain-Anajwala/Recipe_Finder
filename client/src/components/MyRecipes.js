@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import API from '../config/api';
 import { useNavigate } from 'react-router-dom';
-import { BASE_URL } from '../config/api';
 
 function MyRecipes() {
   const [recipes, setRecipes] = useState([]);
@@ -31,7 +30,7 @@ function MyRecipes() {
     }
 
     try {
-      const response = await axios.get('${BASE_URL}/api/recipes/my-submissions', getAuthConfig());
+      const response = await API.get('/api/recipes/my-submissions', getAuthConfig());
       setRecipes(response.data);
       setLoading(false);
     } catch (error) {
@@ -47,7 +46,7 @@ function MyRecipes() {
     }
 
     try {
-      await axios.delete(`${BASE_URL}/api/recipes/${recipeId}`, getAuthConfig());
+      await API.delete(`/api/recipes/${recipeId}`, getAuthConfig());
       alert('Recipe deleted successfully!');
       fetchMyRecipes(); // Refresh the list
     } catch (error) {

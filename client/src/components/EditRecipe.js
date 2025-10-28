@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import axios from 'axios';
+import API from '../config/api';
 import { toast } from '../utils/toast';
-import { BASE_URL } from '../config/api';
 
 function EditRecipe() {
   const { id } = useParams();
@@ -37,7 +36,7 @@ function EditRecipe() {
 
   const fetchRecipe = async () => {
     try {
-      const response = await axios.get(`${BASE_URL}/api/recipes/my-submissions`, getAuthConfig());
+      const response = await API.get(`/api/recipes/my-submissions`, getAuthConfig());
       const recipe = response.data.find(r => r._id === id);
       
       if (!recipe) {
@@ -96,7 +95,7 @@ function EditRecipe() {
     };
 
     try {
-      await axios.put(`${BASE_URL}/api/recipes/${id}`, recipeData, getAuthConfig());
+      await API.put(`/api/recipes/${id}`, recipeData, getAuthConfig());
       toast.success('Recipe updated successfully!');
       navigate('/my-recipes');
     } catch (error) {

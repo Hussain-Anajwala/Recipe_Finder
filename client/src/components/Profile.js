@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import { BASE_URL } from '../config/api';
+import API from '../config/api';
 
 function Profile() {
   const navigate = useNavigate();
@@ -34,7 +33,7 @@ function Profile() {
 
   const fetchProfile = async () => {
     try {
-      const response = await axios.get('${BASE_URL}/api/auth/profile', getAuthConfig());
+      const response = await API.get('/api/auth/profile', getAuthConfig());
       setProfileData({
         firstName: response.data.firstName,
         lastName: response.data.lastName,
@@ -66,7 +65,7 @@ function Profile() {
   const handleProfileSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.put('${BASE_URL}/api/auth/profile', profileData, getAuthConfig());
+      await API.put('/api/auth/profile', profileData, getAuthConfig());
       alert('Profile updated successfully!');
     } catch (error) {
       console.error('Error updating profile:', error);
@@ -88,8 +87,8 @@ function Profile() {
     }
 
     try {
-      await axios.put(
-        '${BASE_URL}/api/auth/change-password',
+      await API.put(
+        '/api/auth/change-password',
         {
           currentPassword: passwordData.currentPassword,
           newPassword: passwordData.newPassword
