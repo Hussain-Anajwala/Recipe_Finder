@@ -4,11 +4,15 @@ import API from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { toast } from '../utils/toast';
 
-function Login() {
+/**
+ * AdminLogin — accessible only via /admin-login (not linked from any public UI).
+ * This page is intentionally hidden from regular users.
+ */
+function AdminLogin() {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
-    role: 'user', // Always user on the public login page
+    role: 'admin',
   });
   const navigate = useNavigate();
   const { login } = useAuth();
@@ -25,23 +29,18 @@ function Login() {
         password: formData.password
       });
 
-      // Verify the role matches what user selected
-      if (response.data.user.role !== formData.role) {
-        toast.error(`Invalid credentials. This account is registered as ${response.data.user.role}.`);
+      if (response.data.user.role !== 'admin') {
+        toast.error('Access denied. This portal is for administrators only.');
         return;
       }
 
-      // Use the login function from AuthContext
       login(response.data.token, response.data.user);
-
-      console.log('Login successful:', response.data);
-      toast.success(`Welcome ${response.data.user.firstName}!`);
-
-      navigate('/my-recipes');
+      toast.success(`Welcome, ${response.data.user.firstName}.`);
+      navigate('/admin');
 
     } catch (error) {
-      console.error('Login error:', error.response ? error.response.data : error.message);
-      toast.error(`Login failed: ${error.response ? error.response.data.message : 'Invalid credentials'}`);
+      console.error('Admin login error:', error.response ? error.response.data : error.message);
+      toast.error(`Authentication failed: ${error.response ? error.response.data.message : 'Invalid credentials'}`);
     }
   };
 
@@ -58,36 +57,36 @@ function Login() {
         setShowChefNote(false);
       }
     };
-    // Listen on capture phase so clicks anywhere dismiss it
     document.addEventListener('mousedown', handleClickOutside, true);
     return () => document.removeEventListener('mousedown', handleClickOutside, true);
   }, [showChefNote]);
 
   return (
     <div className="bg-background text-on-surface font-body min-h-screen flex items-stretch">
-      {/* Left Column: Branding & Imagery */}
-      <section className="hidden lg:flex w-1/2 bg-primary relative overflow-hidden flex-col justify-between p-16 text-on-primary">
+      {/* Left Column: Branding & Imagery — darker admin aesthetic */}
+      <section className="hidden lg:flex w-1/2 bg-on-surface relative overflow-hidden flex-col justify-between p-16 text-surface">
         <div className="absolute inset-0 grain-overlay pointer-events-none"></div>
-        <div className="absolute inset-0 opacity-40 mix-blend-multiply">
-          <img alt="artisan kitchen background" className="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDF0ARxtPNEXliWi9_quX2avXxcvRb6NmYAW8EPRcAgM2dl1t_Ym2BaIAmJJJoptKUmXSRp3Yay6pqxQAM-ijVCpHX-9TUkmjjbSLHiQpjSZkEXOc5otg7k8twQOdrnJjyUeXN2KJXcv1-nOwCwv4p4KU2-VCIFqbl0-GFo_76K88MLfwAYQjVPra00csM-9UvagriHH9npVBuhxpYbLHuYqHXDC4r_SMm0sZYdxd8qv8Si2q2UyJSPdsRTXMy30CD9jUS09kb25_s5"/>
-        </div>
         
         <div className="relative z-10 pt-10">
-          <h1 className="font-display text-6xl font-semibold tracking-tighter cursor-pointer" onClick={() => navigate('/')}>Savour</h1>
-          <div className="h-1 w-12 bg-on-primary mt-4"></div>
+          <h1 className="font-display text-6xl font-semibold tracking-tighter cursor-pointer text-surface" onClick={() => navigate('/')}>Savour</h1>
+          <div className="h-1 w-12 bg-surface/40 mt-4"></div>
         </div>
         
         <div className="relative z-10 max-w-md">
-          <h2 className="font-display text-5xl leading-tight italic">Every great meal begins with a great recipe.</h2>
-          <p className="mt-8 font-body text-lg opacity-90 leading-relaxed font-light">
-              Join our curated community of culinary enthusiasts and explore the sensory world of professional gastronomy.
+          <div className="inline-flex items-center gap-2 bg-primary/20 border border-primary/30 px-3 py-1.5 rounded-sm mb-8">
+            <span className="material-symbols-outlined text-sm text-primary/80">shield</span>
+            <span className="font-technical text-xs text-primary/80 tracking-widest uppercase">Restricted Access</span>
+          </div>
+          <h2 className="font-display text-5xl leading-tight italic text-surface/90">Administrator Portal.</h2>
+          <p className="mt-8 font-body text-base opacity-70 leading-relaxed font-light text-surface">
+            This area is for Savour administrators only. Unauthorized access attempts are logged.
           </p>
         </div>
         
-        <div className="relative z-10 flex items-center gap-4 text-xs font-label tracking-[0.2em] uppercase">
-          <span>The Sensory Sommelier</span>
-          <span className="w-8 h-[1px] bg-on-primary/40"></span>
-          <span>Est. 2024</span>
+        <div className="relative z-10 flex items-center gap-4 text-xs font-label tracking-[0.2em] uppercase text-surface/40">
+          <span>Savour Admin</span>
+          <span className="w-8 h-[1px] bg-surface/20"></span>
+          <span>Secured Portal</span>
         </div>
       </section>
 
@@ -99,8 +98,12 @@ function Login() {
           </div>
           
           <header className="mb-12">
-            <h2 className="font-display text-4xl text-on-surface mb-3 font-bold tracking-tight">Welcome back.</h2>
-            <p className="text-on-surface-variant font-body text-base">Sign in to your Savour account.</p>
+            <div className="flex items-center gap-2 mb-4">
+              <span className="material-symbols-outlined text-sm text-primary">shield</span>
+              <span className="font-technical text-xs text-primary tracking-widest uppercase">Admin Portal</span>
+            </div>
+            <h2 className="font-display text-4xl text-on-surface mb-3 font-bold tracking-tight">Administrator Sign In.</h2>
+            <p className="text-on-surface-variant font-body text-base">Authorized personnel only.</p>
           </header>
 
           <form onSubmit={handleSubmit} className="space-y-8">
@@ -113,7 +116,7 @@ function Login() {
                 value={formData.email}
                 onChange={handleChange}
                 required
-                placeholder="chef@savour.com" 
+                placeholder="admin@savour.com" 
                 className="w-full bg-transparent border-0 border-b border-outline/30 focus:border-primary focus:ring-0 px-0 py-3 font-body text-base text-on-surface placeholder:text-outline/40 transition-all" 
               />
             </div>
@@ -121,7 +124,6 @@ function Login() {
             <div className="group">
               <div className="flex justify-between items-end mb-3">
                 <label htmlFor="password" className="block text-xs font-label font-bold tracking-[0.15em] text-on-surface-variant uppercase group-focus-within:text-primary transition-colors">Password</label>
-                <button type="button" className="text-xs font-label font-bold tracking-[0.1em] text-primary uppercase hover:opacity-70 transition-opacity">Forgot?</button>
               </div>
               <div className="relative">
                 <input 
@@ -145,25 +147,17 @@ function Login() {
             </div>
 
             <div className="pt-4">
-              <button type="submit" className="w-full bg-primary text-on-primary font-label font-semibold tracking-widest uppercase py-5 px-8 rounded-sm hover:bg-primary-container transition-all active:scale-[0.98] text-sm">
-                  Sign In
+              <button type="submit" className="w-full bg-on-surface text-surface font-label font-semibold tracking-widest uppercase py-5 px-8 rounded-sm hover:opacity-90 transition-all active:scale-[0.98] text-sm">
+                  Sign In as Administrator
               </button>
             </div>
           </form>
 
           <footer className="mt-16 pt-8 border-t border-outline-variant/20">
-            <div className="flex flex-col gap-4 text-center">
-              <p className="text-on-surface-variant text-base font-body">
-                  New to Savour? 
-                  <Link to="/signup" className="text-primary font-semibold hover:underline decoration-primary/30 underline-offset-4 ml-1">Create your account</Link>
-              </p>
-              <div className="flex justify-center items-center gap-6 mt-4">
-                <button type="button" className="text-xs font-label tracking-widest text-outline uppercase hover:text-on-surface transition-colors">Privacy</button>
-                <span className="w-1 h-1 rounded-full bg-outline/30"></span>
-                <button type="button" className="text-xs font-label tracking-widest text-outline uppercase hover:text-on-surface transition-colors">Terms</button>
-                <span className="w-1 h-1 rounded-full bg-outline/30"></span>
-                <button type="button" className="text-xs font-label tracking-widest text-outline uppercase hover:text-on-surface transition-colors">Support</button>
-              </div>
+            <div className="text-center">
+              <Link to="/login" className="text-xs font-label tracking-widest text-outline uppercase hover:text-primary transition-colors">
+                ← Back to Public Sign In
+              </Link>
             </div>
           </footer>
         </div>
@@ -185,8 +179,8 @@ function Login() {
             >
               <span className="material-symbols-outlined text-sm">close</span>
             </button>
-            <span className="font-technical text-xs text-primary block leading-none mb-1.5 pr-4">CHEF'S NOTE</span>
-            <span className="font-technical text-[11px] text-on-surface-variant block leading-tight max-w-[140px]">Recommended: Enable biometric sign-in for faster access.</span>
+            <span className="font-technical text-xs text-primary block leading-none mb-1.5 pr-4">SECURITY NOTE</span>
+            <span className="font-technical text-[11px] text-on-surface-variant block leading-tight max-w-[140px]">This URL is not publicly indexed. Keep it confidential.</span>
           </div>
         </div>
       )}
@@ -194,4 +188,4 @@ function Login() {
   );
 }
 
-export default Login;
+export default AdminLogin;

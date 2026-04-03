@@ -1,13 +1,99 @@
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* ── Tailwind Directives ─────────────────────────────── */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Tailwind Base Overrides ─────────────────────────── */
+@layer base {
+  /* === GLOBAL FONT SCALE ===
+     Root font-size is 18px (up from browser default 16px).
+     This scales ALL rem-based sizes up by ~12.5% sitewide.
+     text-sm  = 14px → 15.75px
+     text-base= 16px → 18px
+     text-lg  = 18px → 20.25px
+     text-xl  = 20px → 22.5px
+     etc.
+  */
+  html {
+    font-size: 18px;
+  }
+
+  body {
+    font-family: 'Jost', sans-serif;
+    font-size: 1rem;      /* 18px */
+    line-height: 1.7;
+    color: #1c1c19;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Cormorant Garamond', serif;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+
+  h1 { font-size: clamp(2.2rem, 5vw, 4rem); }
+  h2 { font-size: clamp(1.6rem, 3.5vw, 2.8rem); }
+  h3 { font-size: clamp(1.3rem, 2.5vw, 2rem); }
+
+  p {
+    font-size: 1rem;
+    line-height: 1.8;
+  }
+
+  /* Monospace / technical text */
+  code, pre, kbd, samp {
+    font-family: 'Courier Prime', monospace;
+    font-size: 0.9em;
+  }
+
+  /* Inputs & buttons inherit body scale */
+  input, textarea, select, button {
+    font-family: 'Jost', sans-serif;
+    font-size: 1rem;
+  }
+
+  /* ── FORCE MINIMUM READABLE SIZE ──────────────────────
+     Any element using tiny hardcoded pixel sizes (text-[10px],
+     text-[9px], text-xs, text-[11px]) gets upgraded to at least
+     13px / 0.72rem so nothing on the site is unreadable.
+     Labels, badges, and tracking-widest tags are included. */
+  label,
+  .font-label,
+  [class*="tracking-"],
+  [class*="uppercase"] {
+    font-size: max(0.75rem, 13px); /* ≥ 13.5px at root 18px */
+  }
+
+  /* Navbar & small UI text */
+  nav a,
+  nav span,
+  nav button {
+    font-size: max(0.85rem, 14px);
+  }
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+/* ── Display Font Aliases ────────────────────────────── */
+.font-display,
+.font-headline {
+  font-family: 'Cormorant Garamond', serif;
+}
+
+.font-technical {
+  font-family: 'Courier Prime', monospace;
+  font-size: max(0.78rem, 13px);
+}
+
+/* ── Force override Tailwind tiny text utilities ─────── */
+/* These !important rules ensure the microscopic hardcoded sizes
+   in component markup are overridden at the stylesheet level.   */
+.text-\[10px\],
+.text-\[9px\],
+.text-\[11px\],
+.text-\[8px\] {
+  font-size: max(0.75rem, 13px) !important;
+}
+
+/* Ensure text-xs is at least 13px everywhere */
+.text-xs {
+  font-size: max(0.75rem, 13px) !important;
 }

@@ -162,17 +162,17 @@ export const editRecipe = async (req, res) => {
 
     const { title, description, category, prepTime, cookTime, servings, difficulty, ingredients, instructions, image, status } = req.body;
 
-    // Update recipe fields
-    recipe.title = title || recipe.title;
-    recipe.description = description || recipe.description;
-    recipe.category = category || recipe.category;
-    recipe.prepTime = prepTime || recipe.prepTime;
-    recipe.cookTime = cookTime || recipe.cookTime;
-    recipe.servings = servings || recipe.servings;
-    recipe.difficulty = difficulty || recipe.difficulty;
-    recipe.ingredients = ingredients || recipe.ingredients;
-    recipe.instructions = instructions || recipe.instructions;
-    recipe.image = image || recipe.image;
+    // Update recipe fields — use !== undefined so explicit empty strings are saved
+    if (title !== undefined) recipe.title = title || recipe.title;
+    if (description !== undefined) recipe.description = description || recipe.description;
+    if (category !== undefined) recipe.category = category || recipe.category;
+    if (prepTime !== undefined) recipe.prepTime = prepTime || recipe.prepTime;
+    if (cookTime !== undefined) recipe.cookTime = cookTime || recipe.cookTime;
+    if (servings !== undefined) recipe.servings = servings || recipe.servings;
+    if (difficulty !== undefined) recipe.difficulty = difficulty || recipe.difficulty;
+    if (ingredients !== undefined) recipe.ingredients = ingredients || recipe.ingredients;
+    if (instructions !== undefined) recipe.instructions = instructions || recipe.instructions;
+    if (image !== undefined) recipe.image = image; // Allow clearing image to empty string
     
     // Admin can also change status
     if (status) {

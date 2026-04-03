@@ -1,860 +1,513 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import API from '../config/api';
-import { useNavigate } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
 import { toast } from '../utils/toast';
+import LoadingSpinner from './LoadingSpinner';
+import { getImageUrl, handleImageError } from '../utils/imageHelper';
 
 function AdminDashboard() {
-  const [stats, setStats] = useState(null);
-  const [submissions, setSubmissions] = useState([]);
-  const [filter, setFilter] = useState('pending');
+  const [allRecipes, setAllRecipes] = useState([]);
+  // Let's pretend we have a users endpoint or just hardcode/use an aggregate count if missing
+  const [usersCount, setUsersCount] = useState(0); 
   const [loading, setLoading] = useState(true);
-  const [selectedRecipe, setSelectedRecipe] = useState(null);
-  const [adminNotes, setAdminNotes] = useState('');
+  const [activeTab, setActiveTab] = useState('pending'); // 'pending', 'approved', 'rejected', 'all'
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // Edit Modal State
   const [editingRecipe, setEditingRecipe] = useState(null);
-  const [editForm, setEditForm] = useState({
+  const [editFormData, setEditFormData] = useState({
     title: '',
     description: '',
     category: '',
     prepTime: '',
     cookTime: '',
     servings: '',
-    difficulty: '',
-    ingredients: [],
-    instructions: [],
-    image: '',
-    status: ''
+    ingredients: '',
+    instructions: '',
+    difficulty: 'Easy',
+    image: ''
   });
-  const navigate = useNavigate();
-  const { isAdmin } = useContext(AuthContext);
 
   useEffect(() => {
-    if (!isAdmin()) {
-      alert('Access denied. Admin only.');
-      navigate('/');
-      return;
-    }
-    fetchStats();
-    fetchSubmissions(filter);
+    fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter]);
+  }, []);
 
   const getAuthConfig = () => {
     const token = localStorage.getItem('token');
-    return {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    };
+    return { headers: { 'Authorization': `Bearer ${token}` } };
   };
 
-  const fetchStats = async () => {
-    try {
-      const response = await API.get('/api/admin/stats', getAuthConfig());
-      setStats(response.data);
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-    }
-  };
-
-  const fetchSubmissions = async (status) => {
+  const fetchData = async () => {
     setLoading(true);
     try {
-      const url = status === 'all' 
-        ? '/api/admin/submissions'
-        : `/api/admin/submissions?status=${status}`;
-      
-      const response = await API.get(url, getAuthConfig());
-      setSubmissions(response.data);
+      // Fetch ALL submissions (pending, approved, rejected) via admin endpoint
+      const [submissionsRes, usersRes] = await Promise.all([
+        API.get('/api/admin/submissions', getAuthConfig()),
+        API.get('/api/admin/users', getAuthConfig()).catch(() => ({ data: [] }))
+      ]);
+
+      setAllRecipes(submissionsRes.data || []);
+      setUsersCount(usersRes.data?.length || 0);
       setLoading(false);
     } catch (error) {
-      console.error('Error fetching submissions:', error);
+      console.error('Error fetching data:', error);
+      toast.error('Failed to load submissions.');
       setLoading(false);
     }
   };
 
-  const handleApprove = async (recipeId) => {
+  const handleStatusChange = async (recipeId, newStatus) => {
     try {
-      await API.put(
-        `/api/admin/submissions/${recipeId}/approve`,
-        { adminNotes },
-        getAuthConfig()
-      );
-      toast.success('Recipe approved successfully!');
-      setAdminNotes('');
-      setSelectedRecipe(null);
-      fetchStats();
-      fetchSubmissions(filter);
+      const endpoint = newStatus === 'approved' 
+         ? `/api/admin/submissions/${recipeId}/approve` 
+         : `/api/admin/submissions/${recipeId}/reject`;
+      await API.put(endpoint, {}, getAuthConfig());
+      toast.success(`Submission marked as ${newStatus}`);
+      fetchData(); // Refresh all
     } catch (error) {
-      console.error('Error approving recipe:', error);
-      toast.error('Failed to approve recipe');
+      console.error('Error updating status:', error);
+      toast.error('Failed to change status');
     }
   };
 
-  const handleReject = async (recipeId) => {
-    if (!adminNotes.trim()) {
-      toast.warning('Please provide a reason for rejection in the admin notes.');
-      return;
-    }
-    
-    try {
-      await API.put(
-        `/api/admin/submissions/${recipeId}/reject`,
-        { adminNotes },
-        getAuthConfig()
-      );
-      toast.success('Recipe rejected.');
-      setAdminNotes('');
-      setSelectedRecipe(null);
-      fetchStats();
-      fetchSubmissions(filter);
-    } catch (error) {
-      console.error('Error rejecting recipe:', error);
-      toast.error('Failed to reject recipe');
-    }
-  };
-
-  const handleDeleteRecipe = async (recipeId, recipeTitle) => {
-    if (!window.confirm(`Are you sure you want to permanently delete "${recipeTitle}"? This action cannot be undone.`)) {
-      return;
-    }
-
-    try {
-      await API.delete(`/api/admin/recipes/${recipeId}`, getAuthConfig());
-      toast.success('Recipe deleted successfully!');
-      fetchStats();
-      fetchSubmissions(filter);
-    } catch (error) {
-      console.error('Error deleting recipe:', error);
-      toast.error('Failed to delete recipe');
-    }
-  };
-
-  const handleEditRecipe = (recipe) => {
+  // ----- Edit Logic -----
+  const openEditModal = (recipe) => {
     setEditingRecipe(recipe);
-    setEditForm({
-      title: recipe.title,
-      description: recipe.description,
-      category: recipe.category,
-      prepTime: recipe.prepTime,
-      cookTime: recipe.cookTime,
-      servings: recipe.servings,
-      difficulty: recipe.difficulty,
-      ingredients: recipe.ingredients,
-      instructions: recipe.instructions,
-      image: recipe.image || '',
-      status: recipe.status
+    setEditFormData({
+      title: recipe.title || '',
+      description: recipe.description || '',
+      category: recipe.category || '',
+      prepTime: recipe.prepTime || 0,
+      cookTime: recipe.cookTime || 0,
+      servings: recipe.servings || 1,
+      ingredients: recipe.ingredients ? recipe.ingredients.join('\n') : '',
+      instructions: recipe.instructions ? recipe.instructions.join('\n') : '',
+      difficulty: recipe.difficulty || 'Easy',
+      image: recipe.image || recipe.imageUrl || ''
     });
   };
 
-  const handleUpdateRecipe = async () => {
+  const closeEditModal = () => {
+    setEditingRecipe(null);
+  };
+
+  const handleEditChange = (e) => {
+    setEditFormData({ ...editFormData, [e.target.name]: e.target.value });
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
     try {
-      console.log('Updating recipe:', editingRecipe._id);
-      console.log('Edit form data:', editForm);
-      
-      const response = await API.put(
-        `/api/admin/recipes/${editingRecipe._id}`,
-        editForm,
-        getAuthConfig()
-      );
-      
-      console.log('Update response:', response.data);
-      toast.success('Recipe updated successfully!');
-      setEditingRecipe(null);
-      setEditForm({
-        title: '',
-        description: '',
-        category: '',
-        prepTime: '',
-        cookTime: '',
-        servings: '',
-        difficulty: '',
-        ingredients: [],
-        instructions: [],
-        image: '',
-        status: ''
-      });
-      fetchStats();
-      fetchSubmissions(filter);
+      const dataToSubmit = {
+        title: editFormData.title,
+        description: editFormData.description,
+        category: editFormData.category,
+        prepTime: Number(editFormData.prepTime),
+        cookTime: Number(editFormData.cookTime),
+        servings: Number(editFormData.servings),
+        difficulty: editFormData.difficulty,
+        ingredients: editFormData.ingredients.split('\n').filter(i => i.trim() !== ''),
+        instructions: editFormData.instructions.split('\n').filter(i => i.trim() !== ''),
+        image: editFormData.image   // ← matches Recipe model field name
+      };
+
+      await API.put(`/api/admin/recipes/${editingRecipe._id}`, dataToSubmit, getAuthConfig());
+      toast.success('Recipe updated successfully.');
+      closeEditModal();
+      fetchData();
     } catch (error) {
       console.error('Error updating recipe:', error);
-      console.error('Error response:', error.response?.data);
-      console.error('Error status:', error.response?.status);
-      toast.error(`Failed to update recipe: ${error.response?.data?.message || error.message}`);
+      toast.error('Failed to update recipe');
     }
   };
 
-  const addIngredient = () => {
-    setEditForm({
-      ...editForm,
-      ingredients: [...editForm.ingredients, '']
-    });
-  };
+  // Calculate stats
+  const stats = useMemo(() => {
+    return {
+      members: usersCount,
+      total: allRecipes.length,
+      pending: allRecipes.filter(r => r.status === 'pending').length,
+      published: allRecipes.filter(r => r.status === 'approved').length,
+      returned: allRecipes.filter(r => r.status === 'rejected').length
+    };
+  }, [allRecipes, usersCount]);
 
-  const updateIngredient = (index, value) => {
-    const newIngredients = [...editForm.ingredients];
-    newIngredients[index] = value;
-    setEditForm({ ...editForm, ingredients: newIngredients });
-  };
+  // Filter recipes for display
+  const displayRecipes = useMemo(() => {
+    let filtered = allRecipes;
+    if (activeTab !== 'all') {
+       filtered = filtered.filter(r => r.status === activeTab);
+    }
+    if (searchQuery) {
+       filtered = filtered.filter(r => r.title.toLowerCase().includes(searchQuery.toLowerCase()));
+    }
+    return filtered;
+  }, [allRecipes, activeTab, searchQuery]);
 
-  const removeIngredient = (index) => {
-    const newIngredients = editForm.ingredients.filter((_, i) => i !== index);
-    setEditForm({ ...editForm, ingredients: newIngredients });
-  };
-
-  const addInstruction = () => {
-    setEditForm({
-      ...editForm,
-      instructions: [...editForm.instructions, '']
-    });
-  };
-
-  const updateInstruction = (index, value) => {
-    const newInstructions = [...editForm.instructions];
-    newInstructions[index] = value;
-    setEditForm({ ...editForm, instructions: newInstructions });
-  };
-
-  const removeInstruction = (index) => {
-    const newInstructions = editForm.instructions.filter((_, i) => i !== index);
-    setEditForm({ ...editForm, instructions: newInstructions });
-  };
-
-  const StatCard = ({ title, value, color }) => (
-    <div style={{
-      background: 'white',
-      padding: '25px',
-      borderRadius: '8px',
-      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-      borderLeft: `4px solid ${color}`,
-      flex: 1,
-      minWidth: '200px'
-    }}>
-      <div style={{ fontSize: '14px', color: '#7f8c8d', marginBottom: '8px' }}>{title}</div>
-      <div style={{ fontSize: '32px', fontWeight: 'bold', color: color }}>{value}</div>
-    </div>
-  );
+  if (loading && allRecipes.length === 0) {
+    return <LoadingSpinner />;
+  }
 
   return (
-    <div style={{ padding: '40px', maxWidth: '1400px', margin: '0 auto', background: '#f5f6fa', minHeight: '100vh' }} className="responsive-container">
-      <style>{`
-        @media screen and (max-width: 768px) {
-          .responsive-container {
-            padding: 20px 15px !important;
-          }
+    <main className="min-h-screen bg-surface pt-28 pb-20 px-6 md:px-12 relative overflow-x-hidden">
+      <div className="absolute inset-0 grain-overlay z-[0] pointer-events-none"></div>
 
-          .stats-grid {
-            grid-template-columns: 1fr !important;
-          }
+      <div className="max-w-7xl mx-auto relative z-10 space-y-16">
+        
+        {/* Header Section */}
+        <header>
+          <h1 className="text-5xl md:text-6xl font-headline font-bold text-on-surface tracking-tight mb-4">Editorial Dashboard</h1>
+          <p className="text-on-surface-variant text-lg max-w-2xl leading-relaxed">
+            Review and manage all recipe submissions. Maintain the sensory excellence of Savour by curating the most exceptional culinary expressions.
+          </p>
+        </header>
 
-          .filter-tabs {
-            flex-wrap: wrap !important;
-          }
-
-          .filter-tabs button {
-            flex: 1;
-            min-width: 120px;
-          }
-
-          .edit-form-grid {
-            grid-template-columns: 1fr !important;
-          }
-
-          .edit-form-grid-4 {
-            grid-template-columns: 1fr !important;
-          }
-        }
-      `}</style>
-      <h1 style={{ marginBottom: '30px' }}>Admin Dashboard</h1>
-
-      {/* Statistics Cards */}
-      {stats && (
-        <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '40px' }}>
-          <StatCard title="Total Users" value={stats.totalUsers} color="#3498db" />
-          <StatCard title="Total Recipes" value={stats.totalRecipes} color="#9b59b6" />
-          <StatCard title="Pending" value={stats.pendingRecipes} color="#f39c12" />
-          <StatCard title="Approved" value={stats.approvedRecipes} color="#27ae60" />
-          <StatCard title="Rejected" value={stats.rejectedRecipes} color="#e74c3c" />
+        {/* Stats Row */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-px bg-outline-variant/20 rounded-sm overflow-hidden editorial-shadow">
+          <div className="bg-surface p-6 md:p-8 border-r border-outline-variant/10">
+            <span className="block text-[10px] tracking-[0.2em] font-bold text-on-surface-variant mb-2 uppercase">TOTAL MEMBERS</span>
+            <span className="text-3xl md:text-4xl font-headline text-primary">{stats.members.toLocaleString()}</span>
+          </div>
+          <div className="bg-surface p-6 md:p-8 border-r border-outline-variant/10">
+            <span className="block text-[10px] tracking-[0.2em] font-bold text-on-surface-variant mb-2 uppercase">RECIPES</span>
+            <span className="text-3xl md:text-4xl font-headline text-primary">{stats.total.toLocaleString()}</span>
+          </div>
+          <div className="bg-surface p-6 md:p-8 border-r border-outline-variant/10">
+            <span className="block text-[10px] tracking-[0.2em] font-bold text-primary mb-2 uppercase">AWAITING REVIEW</span>
+            <span className="text-3xl md:text-4xl font-headline text-primary">{stats.pending.toLocaleString()}</span>
+          </div>
+          <div className="bg-surface p-6 md:p-8 border-r border-outline-variant/10">
+            <span className="block text-[10px] tracking-[0.2em] font-bold text-on-surface-variant mb-2 uppercase">PUBLISHED</span>
+            <span className="text-3xl md:text-4xl font-headline text-primary">{stats.published.toLocaleString()}</span>
+          </div>
+          <div className="bg-surface p-6 md:p-8">
+            <span className="block text-[10px] tracking-[0.2em] font-bold text-on-surface-variant mb-2 uppercase">RETURNED</span>
+            <span className="text-3xl md:text-4xl font-headline text-primary">{stats.returned.toLocaleString()}</span>
+          </div>
         </div>
-      )}
 
-      {/* Filter Tabs */}
-      <div className="filter-tabs" style={{ marginBottom: '30px', display: 'flex', gap: '10px' }}>
-        {['pending', 'approved', 'rejected', 'all'].map((status) => (
-          <button
-            key={status}
-            onClick={() => setFilter(status)}
-            style={{
-              padding: '10px 20px',
-              background: filter === status ? '#3498db' : 'white',
-              color: filter === status ? 'white' : '#2c3e50',
-              border: '1px solid #ddd',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontWeight: filter === status ? 'bold' : 'normal',
-              textTransform: 'capitalize'
-            }}
-          >
-            {status}
-          </button>
-        ))}
+        {/* Filters & Search */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
+          <div className="flex flex-wrap gap-2">
+            <button 
+              onClick={() => setActiveTab('pending')}
+              className={`px-6 py-2 rounded-full text-xs font-semibold tracking-wider transition-all uppercase ${activeTab === 'pending' ? 'bg-primary text-on-primary' : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-variant'}`}
+            >
+              AWAITING REVIEW
+            </button>
+            <button 
+              onClick={() => setActiveTab('approved')}
+              className={`px-6 py-2 rounded-full text-xs font-semibold tracking-wider transition-all uppercase ${activeTab === 'approved' ? 'bg-primary text-on-primary' : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-variant'}`}
+            >
+              PUBLISHED
+            </button>
+            <button 
+              onClick={() => setActiveTab('rejected')}
+              className={`px-6 py-2 rounded-full text-xs font-semibold tracking-wider transition-all uppercase ${activeTab === 'rejected' ? 'bg-primary text-on-primary' : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-variant'}`}
+            >
+              RETURNED
+            </button>
+            <button 
+              onClick={() => setActiveTab('all')}
+              className={`px-6 py-2 rounded-full text-xs font-semibold tracking-wider transition-all uppercase ${activeTab === 'all' ? 'bg-primary text-on-primary' : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-variant'}`}
+            >
+              ALL SUBMISSIONS
+            </button>
+          </div>
+          
+          <div className="relative w-full md:w-72">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">search</span>
+            <input 
+              type="text" 
+              placeholder="Search submissions..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-transparent border-b border-outline focus:border-primary focus:ring-0 transition-colors text-sm font-body outline-none"
+            />
+          </div>
+        </div>
+
+        {/* Submissions List */}
+        <div className="space-y-8">
+          {displayRecipes.length === 0 ? (
+             <div className="py-24 text-center border border-dashed border-outline-variant bg-surface-container-lowest editorial-shadow">
+               <h3 className="font-headline text-2xl text-on-surface italic">No submissions match the current filter.</h3>
+             </div>
+          ) : (
+            displayRecipes.map((recipe) => (
+               <article key={recipe._id} className="bg-surface-container-lowest p-8 md:p-10 group hover:shadow-[0px_20px_40px_rgba(88,65,60,0.08)] transition-all duration-500 flex flex-col md:flex-row gap-10 border border-outline-variant/10 relative">
+                 <div className="w-full md:w-64 h-48 overflow-hidden rounded-sm bg-surface-container shrink-0 relative">
+                   <img 
+                     src={getImageUrl(recipe.imageUrl || recipe.image)} 
+                     alt={recipe.title} 
+                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                     onError={handleImageError}
+                   />
+                 </div>
+                 
+                 <div className="flex-1 flex flex-col">
+                   <div className="flex justify-between items-start mb-4">
+                     <div>
+                       <h2 className="text-3xl font-headline font-bold text-on-surface group-hover:text-primary transition-colors cursor-pointer" onClick={() => openEditModal(recipe)}>
+                         {recipe.title}
+                       </h2>
+                       <p className="text-sm text-on-surface-variant mt-1">
+                         Submitted by <span className="font-semibold text-on-surface">{recipe.author?.username || 'Unknown'}</span> <span className="mx-1 opacity-40">|</span> Community Member
+                       </p>
+                     </div>
+                     <span className={`px-3 py-1 border text-[10px] tracking-[0.1em] font-bold rounded-full uppercase
+                        ${recipe.status === 'pending' ? 'bg-tertiary-container/10 text-tertiary-container border-tertiary-container/20' : ''}
+                        ${recipe.status === 'approved' ? 'bg-secondary-container/20 text-secondary border-secondary/20' : ''}
+                        ${recipe.status === 'rejected' ? 'bg-error-container/20 text-error border-error/20' : ''}`}>
+                       {recipe.status === 'pending' ? 'AWAITING REVIEW' : recipe.status}
+                     </span>
+                   </div>
+                   
+                   <p className="text-on-surface-variant leading-relaxed mb-6 line-clamp-2">
+                     {recipe.description}
+                   </p>
+                   
+                   <div className="flex flex-wrap gap-6 mt-auto">
+                     <div className="flex items-center gap-2 text-on-surface-variant">
+                       <span className="material-symbols-outlined text-[18px]">schedule</span>
+                       <span className="font-technical text-xs">{recipe.cookingTime || recipe.prepTime || 0} MIN</span>
+                     </div>
+                     <div className="flex items-center gap-2 text-on-surface-variant">
+                       <span className="material-symbols-outlined text-[18px]">restaurant</span>
+                       <span className="font-technical text-xs tracking-wider uppercase">DIFFICULTY: {recipe.difficulty || 'EASY'}</span>
+                     </div>
+                     <div className="flex items-center gap-2 text-on-surface-variant">
+                       <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
+                       <span className="font-technical text-xs tracking-wider uppercase">{(recipe.ingredients || []).length} INGREDIENTS</span>
+                     </div>
+                   </div>
+                 </div>
+                 
+                 {/* Action Buttons purely structured around admin task */}
+                 <div className="flex md:flex-col justify-end md:justify-center gap-3 pt-6 md:pt-0 md:pl-8 md:border-l border-outline-variant/10 shrink-0">
+                    {recipe.status === 'pending' && (
+                       <>
+                         <button 
+                           onClick={() => openEditModal(recipe)}
+                           className="px-6 py-2.5 bg-primary text-on-primary text-xs font-semibold tracking-widest rounded-sm hover:opacity-90 transition-opacity uppercase text-center"
+                         >
+                           BEGIN REVIEW
+                         </button>
+                         <button 
+                           onClick={() => handleStatusChange(recipe._id, 'approved')}
+                           className="px-6 py-2.5 border border-secondary text-secondary text-xs font-semibold tracking-widest rounded-sm hover:bg-secondary/10 transition-colors uppercase text-center"
+                         >
+                           PUBLISH
+                         </button>
+                         <button 
+                           onClick={() => handleStatusChange(recipe._id, 'rejected')}
+                           className="px-6 py-2.5 border border-outline text-on-surface text-xs font-semibold tracking-widest rounded-sm hover:bg-surface-container transition-colors uppercase text-center"
+                         >
+                           RETURN
+                         </button>
+                       </>
+                    )}
+
+                    {recipe.status === 'approved' && (
+                       <>
+                         <button 
+                           onClick={() => openEditModal(recipe)}
+                           className="px-6 py-2.5 border border-outline text-on-surface text-xs font-semibold tracking-widest rounded-sm hover:bg-surface-container transition-colors uppercase text-center"
+                         >
+                           AMEND
+                         </button>
+                         <button 
+                           onClick={() => handleStatusChange(recipe._id, 'rejected')}
+                           className="px-6 py-2.5 border border-error text-error text-xs font-semibold tracking-widest rounded-sm hover:bg-error-container/20 transition-colors uppercase text-center"
+                         >
+                           REVOKE
+                         </button>
+                       </>
+                    )}
+
+                    {recipe.status === 'rejected' && (
+                       <>
+                         <button 
+                           onClick={() => handleStatusChange(recipe._id, 'approved')}
+                           className="px-6 py-2.5 border border-secondary text-secondary text-xs font-semibold tracking-widest rounded-sm hover:bg-secondary/10 transition-colors uppercase text-center"
+                         >
+                           RECONSIDER
+                         </button>
+                       </>
+                    )}
+                 </div>
+               </article>
+            ))
+          )}
+        </div>
+
       </div>
 
-      {/* Submissions List */}
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: '40px' }}>Loading submissions...</div>
-      ) : submissions.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '60px', background: 'white', borderRadius: '8px' }}>
-          <h3>No {filter} submissions found</h3>
-        </div>
-      ) : (
-        <div style={{ display: 'grid', gap: '20px' }}>
-          {submissions.map((recipe) => (
-            <div 
-              key={recipe._id}
-              style={{
-                background: 'white',
-                borderRadius: '8px',
-                padding: '25px',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
-                <div>
-                  <h3 style={{ margin: '0 0 8px 0' }}>{recipe.title}</h3>
-                  <div style={{ fontSize: '14px', color: '#7f8c8d' }}>
-                    Submitted by: <strong>{recipe.submittedBy?.firstName} {recipe.submittedBy?.lastName}</strong> ({recipe.submittedBy?.email})
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#95a5a6', marginTop: '4px' }}>
-                    {new Date(recipe.createdAt).toLocaleString()}
-                  </div>
-                </div>
-                <span style={{
-                  padding: '6px 14px',
-                  borderRadius: '12px',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  color: 'white',
-                  backgroundColor: recipe.status === 'approved' ? '#27ae60' : recipe.status === 'rejected' ? '#e74c3c' : '#f39c12',
-                  height: 'fit-content',
-                  textTransform: 'uppercase'
-                }}>
-                  {recipe.status}
-                </span>
+      {/* Editor Modal Overlay */}
+      {editingRecipe && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-surface/90 backdrop-blur-sm" onClick={closeEditModal}></div>
+          <div className="bg-surface-container-lowest editorial-shadow w-full max-w-4xl max-h-[90vh] overflow-y-auto relative z-10 border border-outline/30">
+            
+            <header className="sticky top-0 bg-surface-container-lowest/95 backdrop-blur-md p-6 border-b border-outline/30 flex justify-between items-center z-20">
+              <div>
+                <span className="font-label text-primary tracking-[0.2em] text-[10px] font-bold block uppercase mb-1">Editor Mode</span>
+                <h2 className="font-headline text-2xl text-on-surface leading-tight">Amending '{editingRecipe.title}'</h2>
               </div>
+              <button 
+                onClick={closeEditModal}
+                className="w-10 h-10 border border-outline/30 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-low transition-colors"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </header>
 
-              <p style={{ color: '#2c3e50', marginBottom: '15px' }}>{recipe.description}</p>
-
-              <div style={{ display: 'flex', gap: '20px', fontSize: '14px', color: '#7f8c8d', marginBottom: '15px' }}>
-                <span>📁 {recipe.category}</span>
-                <span>⏱️ Prep: {recipe.prepTime}m</span>
-                <span>🔥 Cook: {recipe.cookTime}m</span>
-                <span>🍽️ Servings: {recipe.servings}</span>
-                <span>📊 {recipe.difficulty}</span>
-              </div>
-
-              <div style={{ marginBottom: '15px' }}>
-                <strong>Ingredients:</strong>
-                <ul style={{ marginTop: '8px', paddingLeft: '20px' }}>
-                  {recipe.ingredients.slice(0, 3).map((ing, idx) => (
-                    <li key={idx} style={{ fontSize: '14px' }}>{ing}</li>
-                  ))}
-                  {recipe.ingredients.length > 3 && (
-                    <li style={{ fontSize: '14px', color: '#7f8c8d' }}>
-                      ...and {recipe.ingredients.length - 3} more
-                    </li>
-                  )}
-                </ul>
-              </div>
-
-              {recipe.adminNotes && (
-                <div style={{
-                  padding: '12px',
-                  background: '#fff3cd',
-                  borderLeft: '4px solid #ffc107',
-                  borderRadius: '4px',
-                  marginBottom: '15px'
-                }}>
-                  <strong>Admin Notes:</strong> {recipe.adminNotes}
-                </div>
-              )}
-
-              {(recipe.status === 'approved' || recipe.status === 'rejected') && (
-                <div style={{ marginTop: '20px', borderTop: '1px solid #ecf0f1', paddingTop: '20px', display: 'flex', gap: '10px' }}>
-                  <button
-                    onClick={() => handleEditRecipe(recipe)}
-                    style={{
-                      padding: '10px 20px',
-                      background: '#3498db',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontWeight: 'bold'
-                    }}
-                  >
-                    ✏️ Edit Recipe
-                  </button>
-                  <button
-                    onClick={() => handleDeleteRecipe(recipe._id, recipe.title)}
-                    style={{
-                      padding: '10px 20px',
-                      background: '#e74c3c',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontWeight: 'bold'
-                    }}
-                  >
-                    🗑️ Delete Recipe
-                  </button>
-                </div>
-              )}
-
-              {recipe.status === 'pending' && (
-                <div style={{ marginTop: '20px', borderTop: '1px solid #ecf0f1', paddingTop: '20px' }}>
-                  {selectedRecipe === recipe._id ? (
+            <div className="p-6 md:p-8">
+              <form onSubmit={handleEditSubmit} className="space-y-12">
+                
+                {/* Visual Identity Section */}
+                <div className="border-b border-outline/30 pb-10">
+                  <h3 className="font-technical uppercase tracking-widest text-xs font-bold text-on-surface mb-8 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[1rem]">title</span> I. Composition Identity
+                  </h3>
+                  <div className="space-y-8">
                     <div>
-                      <textarea
-                        placeholder="Add admin notes (optional for approval, required for rejection)"
-                        value={adminNotes}
-                        onChange={(e) => setAdminNotes(e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '10px',
-                          borderRadius: '4px',
-                          border: '1px solid #ddd',
-                          marginBottom: '10px',
-                          minHeight: '80px',
-                          fontFamily: 'inherit'
-                        }}
+                      <label className="font-label text-[10px] uppercase tracking-widest text-on-surface-variant block mb-2 font-bold">Manuscript Title</label>
+                      <input
+                        type="text" name="title" value={editFormData.title} onChange={handleEditChange} required
+                        className="w-full bg-transparent border-b border-outline pb-2 font-headline text-3xl text-on-surface focus:outline-none focus:border-primary transition-colors placeholder:text-outline-variant"
                       />
-                      <div style={{ display: 'flex', gap: '10px' }}>
-                        <button
-                          onClick={() => handleApprove(recipe._id)}
-                          style={{
-                            padding: '10px 20px',
-                            background: '#27ae60',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontWeight: 'bold'
-                          }}
-                        >
-                          ✓ Approve
-                        </button>
-                        <button
-                          onClick={() => handleReject(recipe._id)}
-                          style={{
-                            padding: '10px 20px',
-                            background: '#e74c3c',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontWeight: 'bold'
-                          }}
-                        >
-                          ✗ Reject
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSelectedRecipe(null);
-                            setAdminNotes('');
-                          }}
-                          style={{
-                            padding: '10px 20px',
-                            background: '#95a5a6',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '6px',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Cancel
-                        </button>
+                    </div>
+                    <div>
+                      <label className="font-label text-[10px] uppercase tracking-widest text-on-surface-variant block mb-2 font-bold">Editorial Abstract (Description)</label>
+                      <textarea
+                        name="description" value={editFormData.description} onChange={handleEditChange} required rows="3"
+                        className="w-full bg-transparent border-b border-outline pb-2 font-body text-base text-on-surface focus:outline-none focus:border-primary transition-colors resize-none placeholder:text-outline-variant"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Technical Parameters */}
+                <div className="border-b border-outline/30 pb-10">
+                  <h3 className="font-technical uppercase tracking-widest text-xs font-bold text-on-surface mb-8 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[1rem]">tune</span> II. Technical Specifications
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                    <div>
+                      <label className="font-label text-[10px] uppercase tracking-widest text-on-surface-variant block mb-2 font-bold">Prep Time (Min)</label>
+                      <div className="relative">
+                        <input
+                          type="number" name="prepTime" value={editFormData.prepTime} onChange={handleEditChange} required min="0"
+                          className="w-full bg-transparent border-b border-outline pb-2 font-technical text-lg text-on-surface focus:outline-none focus:border-primary transition-colors pl-8"
+                        />
+                        <span className="material-symbols-outlined absolute left-0 top-1/2 -translate-y-1/2 text-[1.2rem] text-on-surface-variant">schedule</span>
                       </div>
                     </div>
-                  ) : (
-                    <button
-                      onClick={() => setSelectedRecipe(recipe._id)}
-                      style={{
-                        padding: '10px 20px',
-                        background: '#3498db',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontWeight: 'bold'
-                      }}
+                    <div>
+                      <label className="font-label text-[10px] uppercase tracking-widest text-on-surface-variant block mb-2 font-bold">Technical Difficulty</label>
+                      <div className="relative">
+                        <select
+                          name="difficulty" value={editFormData.difficulty} onChange={handleEditChange}
+                          className="w-full bg-transparent border-b border-outline pb-2 font-technical text-lg text-on-surface focus:outline-none focus:border-primary transition-colors appearance-none cursor-pointer pl-8"
+                        >
+                          <option value="Easy" className="bg-surface">Novice (Easy)</option>
+                          <option value="Medium" className="bg-surface">Intermediate (Medium)</option>
+                          <option value="Hard" className="bg-surface">Advanced (Hard)</option>
+                        </select>
+                        <span className="material-symbols-outlined absolute left-0 top-1/2 -translate-y-1/2 text-[1.2rem] text-on-surface-variant">bar_chart</span>
+                        <span className="material-symbols-outlined absolute right-0 top-1/2 -translate-y-1/2 text-[1.5rem] text-on-surface-variant pointer-events-none">arrow_drop_down</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Substantive Elements */}
+                <div>
+                   <h3 className="font-technical uppercase tracking-widest text-xs font-bold text-on-surface mb-8 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[1rem]">format_list_bulleted</span> III. Substantive Elements
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                    <div>
+                       <label className="font-label text-[10px] uppercase tracking-widest text-on-surface-variant block mb-3 font-bold">Component Assets (Ingredients)</label>
+                       <p className="font-technical text-[10px] text-on-surface-variant mb-4 italic">Separate elements with a newline. Precise measurements recommended.</p>
+                       <textarea
+                         name="ingredients" value={editFormData.ingredients} onChange={handleEditChange} required rows="10"
+                         className="w-full bg-surface-container-low border border-outline/30 p-5 font-technical text-base text-on-surface focus:outline-none focus:border-primary transition-colors resize-y leading-relaxed"
+                         placeholder="1 cup artisanal flour&#10;2 tbsp clarified butter"
+                       />
+                    </div>
+                    <div>
+                       <label className="font-label text-[10px] uppercase tracking-widest text-on-surface-variant block mb-3 font-bold">Methodological Process (Instructions)</label>
+                       <p className="font-technical text-[10px] text-on-surface-variant mb-4 italic">Sequential chronology. One step per newline.</p>
+                       <textarea
+                         name="instructions" value={editFormData.instructions} onChange={handleEditChange} required rows="10"
+                         className="w-full bg-surface-container-low border border-outline/30 p-5 font-body text-base text-on-surface focus:outline-none focus:border-primary transition-colors resize-y leading-relaxed"
+                         placeholder="1. Sift the dry ingredients carefully.&#10;2. Fold in the butter with precision."
+                       />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Cover Image */}
+                <div className="border-b border-outline/30 pb-10">
+                  <h3 className="font-technical uppercase tracking-widest text-xs font-bold text-on-surface mb-8 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[1rem]">image</span> IV. Cover Image
+                  </h3>
+                  <div>
+                    <label className="font-label text-[10px] uppercase tracking-widest text-on-surface-variant block mb-2 font-bold">Image URL</label>
+                    <div className="flex items-center gap-3 border-b border-outline pb-2 group focus-within:border-primary transition-colors">
+                      <span className="material-symbols-outlined text-on-surface-variant group-focus-within:text-primary">add_photo_alternate</span>
+                      <input
+                        type="url" name="image" value={editFormData.image} onChange={handleEditChange}
+                        className="w-full bg-transparent border-0 focus:ring-0 py-1 font-body text-sm text-on-surface placeholder:text-outline-variant focus:outline-none"
+                        placeholder="https://images.unsplash.com/photo-..."
+                      />
+                    </div>
+                    {editFormData.image && (
+                      <img
+                        src={editFormData.image}
+                        alt="Preview"
+                        className="mt-4 h-40 w-full object-cover rounded-sm border border-outline/20"
+                        onError={(e) => { e.target.style.display = 'none'; }}
+                      />
+                    )}
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <footer className="pt-8 border-t border-outline/30 flex justify-end gap-4 mt-8">
+                  <button 
+                    type="button" onClick={closeEditModal}
+                    className="font-label text-xs uppercase tracking-widest font-bold px-6 py-3 border border-outline text-on-surface-variant hover:bg-surface-container-low transition-colors"
+                  >
+                    Discard Edits
+                  </button>
+                  <button 
+                    type="submit"
+                    className="bg-primary text-on-primary font-label text-xs uppercase tracking-widest font-bold px-8 py-3 hover:-translate-y-1 transition-transform editorial-shadow"
+                  >
+                    Seal Amendments
+                  </button>
+                  {/* Approve Action shortcut inside Editor */}
+                  {editingRecipe?.status === 'pending' && (
+                    <button 
+                      type="button"
+                      onClick={() => { handleStatusChange(editingRecipe._id, 'approved'); closeEditModal(); }}
+                      className="bg-secondary text-on-secondary font-label text-xs uppercase tracking-widest font-bold px-8 py-3 hover:-translate-y-1 transition-transform editorial-shadow ml-2"
                     >
-                      Review Recipe
+                      Publish
                     </button>
                   )}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+                </footer>
 
-      {/* Edit Recipe Modal */}
-      {editingRecipe && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.7)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          padding: '20px'
-        }}>
-          <div style={{
-            background: 'white',
-            borderRadius: '12px',
-            maxWidth: '800px',
-            maxHeight: '90vh',
-            overflow: 'auto',
-            padding: '40px',
-            position: 'relative',
-            width: '100%'
-          }}>
-            <button
-              onClick={() => setEditingRecipe(null)}
-              style={{
-                position: 'absolute',
-                top: '20px',
-                right: '20px',
-                background: '#e74c3c',
-                color: 'white',
-                border: 'none',
-                borderRadius: '50%',
-                width: '40px',
-                height: '40px',
-                fontSize: '20px',
-                cursor: 'pointer',
-                fontWeight: 'bold'
-              }}
-            >
-              ×
-            </button>
-
-            <h2 style={{ marginTop: 0, marginBottom: '30px' }}>Edit Recipe</h2>
-
-            <div style={{ display: 'grid', gap: '20px' }}>
-              {/* Basic Info */}
-              <div className="edit-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Title</label>
-                  <input
-                    type="text"
-                    value={editForm.title}
-                    onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '10px',
-                      border: '1px solid #ddd',
-                      borderRadius: '6px',
-                      fontSize: '14px'
-                    }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Category</label>
-                  <select
-                    value={editForm.category}
-                    onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '10px',
-                      border: '1px solid #ddd',
-                      borderRadius: '6px',
-                      fontSize: '14px'
-                    }}
-                  >
-                    <option value="Breakfast">Breakfast</option>
-                    <option value="Lunch">Lunch</option>
-                    <option value="Dinner">Dinner</option>
-                    <option value="Dessert">Dessert</option>
-                    <option value="Snack">Snack</option>
-                    <option value="Salad">Salad</option>
-                    <option value="Soup">Soup</option>
-                    <option value="Beverage">Beverage</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Description</label>
-                <textarea
-                  value={editForm.description}
-                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    border: '1px solid #ddd',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                    minHeight: '80px'
-                  }}
-                />
-              </div>
-
-              {/* Time and Servings */}
-              <div className="edit-form-grid-4" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '20px' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Prep Time (min)</label>
-                  <input
-                    type="number"
-                    value={editForm.prepTime}
-                    onChange={(e) => setEditForm({ ...editForm, prepTime: parseInt(e.target.value) })}
-                    style={{
-                      width: '100%',
-                      padding: '10px',
-                      border: '1px solid #ddd',
-                      borderRadius: '6px',
-                      fontSize: '14px'
-                    }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Cook Time (min)</label>
-                  <input
-                    type="number"
-                    value={editForm.cookTime}
-                    onChange={(e) => setEditForm({ ...editForm, cookTime: parseInt(e.target.value) })}
-                    style={{
-                      width: '100%',
-                      padding: '10px',
-                      border: '1px solid #ddd',
-                      borderRadius: '6px',
-                      fontSize: '14px'
-                    }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Servings</label>
-                  <input
-                    type="number"
-                    value={editForm.servings}
-                    onChange={(e) => setEditForm({ ...editForm, servings: parseInt(e.target.value) })}
-                    style={{
-                      width: '100%',
-                      padding: '10px',
-                      border: '1px solid #ddd',
-                      borderRadius: '6px',
-                      fontSize: '14px'
-                    }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Difficulty</label>
-                  <select
-                    value={editForm.difficulty}
-                    onChange={(e) => setEditForm({ ...editForm, difficulty: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '10px',
-                      border: '1px solid #ddd',
-                      borderRadius: '6px',
-                      fontSize: '14px'
-                    }}
-                  >
-                    <option value="Easy">Easy</option>
-                    <option value="Medium">Medium</option>
-                    <option value="Hard">Hard</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Status */}
-              <div>
-                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Status</label>
-                <select
-                  value={editForm.status}
-                  onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    border: '1px solid #ddd',
-                    borderRadius: '6px',
-                    fontSize: '14px'
-                  }}
-                >
-                  <option value="pending">Pending</option>
-                  <option value="approved">Approved</option>
-                  <option value="rejected">Rejected</option>
-                </select>
-              </div>
-
-              {/* Image URL */}
-              <div>
-                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Image URL</label>
-                <input
-                  type="url"
-                  value={editForm.image}
-                  onChange={(e) => setEditForm({ ...editForm, image: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    border: '1px solid #ddd',
-                    borderRadius: '6px',
-                    fontSize: '14px'
-                  }}
-                />
-              </div>
-
-              {/* Ingredients */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                  <label style={{ fontWeight: 'bold' }}>Ingredients</label>
-                  <button
-                    type="button"
-                    onClick={addIngredient}
-                    style={{
-                      padding: '5px 10px',
-                      background: '#27ae60',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '12px'
-                    }}
-                  >
-                    + Add Ingredient
-                  </button>
-                </div>
-                {editForm.ingredients.map((ingredient, index) => (
-                  <div key={index} style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-                    <input
-                      type="text"
-                      value={ingredient}
-                      onChange={(e) => updateIngredient(index, e.target.value)}
-                      style={{
-                        flex: 1,
-                        padding: '8px',
-                        border: '1px solid #ddd',
-                        borderRadius: '4px',
-                        fontSize: '14px'
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeIngredient(index)}
-                      style={{
-                        padding: '8px 12px',
-                        background: '#e74c3c',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              {/* Instructions */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                  <label style={{ fontWeight: 'bold' }}>Instructions</label>
-                  <button
-                    type="button"
-                    onClick={addInstruction}
-                    style={{
-                      padding: '5px 10px',
-                      background: '#27ae60',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '12px'
-                    }}
-                  >
-                    + Add Step
-                  </button>
-                </div>
-                {editForm.instructions.map((instruction, index) => (
-                  <div key={index} style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-                    <span style={{ minWidth: '30px', paddingTop: '8px', fontSize: '14px', fontWeight: 'bold' }}>
-                      {index + 1}.
-                    </span>
-                    <textarea
-                      value={instruction}
-                      onChange={(e) => updateInstruction(index, e.target.value)}
-                      style={{
-                        flex: 1,
-                        padding: '8px',
-                        border: '1px solid #ddd',
-                        borderRadius: '4px',
-                        fontSize: '14px',
-                        minHeight: '60px'
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeInstruction(index)}
-                      style={{
-                        padding: '8px 12px',
-                        background: '#e74c3c',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              {/* Action Buttons */}
-              <div style={{ display: 'flex', gap: '15px', marginTop: '30px' }}>
-                <button
-                  onClick={handleUpdateRecipe}
-                  style={{
-                    padding: '12px 24px',
-                    background: '#27ae60',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontWeight: 'bold',
-                    fontSize: '16px'
-                  }}
-                >
-                  💾 Update Recipe
-                </button>
-                <button
-                  onClick={() => setEditingRecipe(null)}
-                  style={{
-                    padding: '12px 24px',
-                    background: '#95a5a6',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontWeight: 'bold',
-                    fontSize: '16px'
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
+              </form>
             </div>
           </div>
         </div>
       )}
-    </div>
+
+    </main>
   );
 }
 

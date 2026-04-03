@@ -1,372 +1,180 @@
-/* --- UPGRADED STYLE.CSS --- */
+/* ============================================================
+   SAVOUR — Design System Utilities
+   Companion stylesheet for Tailwind CSS.
+   
+   PURPOSE: This file contains ONLY design utilities that
+   cannot be expressed via Tailwind utility classes:
+   — Google Fonts import
+   — Custom component-level styles (grain, shadow)
+   — Scroll & global body enhancements
+   — Animation keyframes
+   
+   DO NOT add generic element overrides (form, nav, main, h1)
+   here — those are handled by Tailwind in each component.
+   ============================================================ */
 
-/* Reset */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+/* Google Fonts are loaded via <link> tags in public/index.html for performance.
+   Loaded: Cormorant Garamond (headlines), Jost (body/label), Courier Prime (technical)
+   Material Symbols Outlined (icons) */
+
+
+/* ── Material Symbols Configuration ────────────────────── */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 200, 'GRAD' 0, 'opsz' 24;
+  display: inline-block;
+  vertical-align: middle;
+  line-height: 1;
+  user-select: none;
 }
 
-/* Base Style with new Font and Colors */
+/* ── Base Body Enhancements ─────────────────────────────── */
+html {
+  scroll-behavior: smooth;
+}
+
 body {
-  font-family: 'Poppins', sans-serif; /* Modern Font */
-  background-color: #f8f9fa; /* Lighter background */
-  color: #343a40;
-  line-height: 1.6;
-}
-
-/* Header */
-header {
-  background: linear-gradient(135deg, #6f42c1, #4a148c);
-  padding: 2rem 1rem;
-  text-align: center;
-  color: #fff;
-  border-radius: 0 0 20px 20px;
-  margin-bottom: 3rem;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-}
-
-header h1 {
-  font-size: 2.5rem;
-  margin-bottom: 0.5rem;
-  font-weight: 700;
-}
-
-/* Navigation */
-nav a {
-  color: #e0cffc;
-  margin: 0 1rem;
-  text-decoration: none;
-  font-weight: 400;
-  transition: color 0.3s ease;
-}
-
-nav a:hover {
-  color: #fff;
-}
-
-/* Main Container */
-main {
-  max-width: 1200px;
-  margin: auto;
-  padding: 1rem;
-}
-
-main h2 {
-  text-align: center;
-  font-size: 2rem;
-  margin-bottom: 2rem;
-  color: #4a148c;
-}
-
-/* --- ENHANCED RECIPE CARD STYLING --- */
-.recipe-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 2rem;
-}
-
-.recipe-card {
-  background: #ffffff;
-  border-radius: 15px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
-  overflow: hidden;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-  display: flex;
-  flex-direction: column;
-}
-
-.recipe-card:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 12px 40px rgba(74, 20, 140, 0.15);
-}
-
-.recipe-card h2 {
-  font-size: 1.5rem;
-  color: #fff;
-  background-color: #6f42c1;
-  padding: 1rem 1.5rem;
-  text-align: left;
   margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Savour surface color as default background */
+  background-color: #fcf9f4;
+  color: #1c1c19;
 }
 
-.recipe-card .ingredients-title {
-  padding: 0 1.5rem;
-  margin-top: 1rem;
-  font-weight: 600;
-  color: #6c757d;
+/* ── Savour Utlity: Editorial Shadow ────────────────────── */
+/* A warm shadow using on-surface-variant tint instead of black */
+.editorial-shadow {
+  box-shadow: 0px 20px 40px rgba(88, 65, 60, 0.08);
 }
 
-.recipe-card ul {
-  list-style: none;
-  padding: 0.5rem 1.5rem;
+/* Stronger editorial shadow for elevated states */
+.editorial-shadow-lg {
+  box-shadow: 0px 32px 60px rgba(88, 65, 60, 0.14);
 }
 
-.recipe-card ul li {
-  padding: 0.5rem 0;
-  border-bottom: 1px solid #e9ecef;
-}
-.recipe-card ul li:last-child {
-  border-bottom: none;
-}
-
-
-/* --- NEW NUTRITION SECTION STYLING --- */
-.nutrition-info {
-  margin-top: auto; /* Pushes nutrition to the bottom */
-  padding: 1.5rem;
-  background-color: #f8f9fa;
-  border-top: 1px solid #e9ecef;
+/* ── Savour Utility: Grain Overlay ──────────────────────── */
+/* 3% opacity noise/grain texture over primary/secondary blocks */
+.grain-overlay {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  opacity: 0.03;
+  pointer-events: none;
 }
 
-.nutrition-info h3 {
-  font-size: 1.1rem;
-  margin-bottom: 1rem;
-  color: #4a148c;
-  text-align: center;
+/* ── Savour Utility: Glassmorphism Nav ──────────────────── */
+/* surface at 80% opacity with 24px backdrop-blur */
+.glass-surface {
+  background-color: rgba(252, 249, 244, 0.80);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
 }
 
-.nutrition-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-  text-align: center;
+/* ── Scrollbar Styling ──────────────────────────────────── */
+/* Subtle warm scrollbar on WebKit browsers */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
-.nutrition-item span {
-  font-size: 0.9rem;
-  color: #6c757d;
-  display: block;
+::-webkit-scrollbar-track {
+  background: #f6f3ee;
 }
 
-.nutrition-item strong {
-  font-size: 1.2rem;
-  color: #343a40;
+::-webkit-scrollbar-thumb {
+  background: #e0bfb9;
+  border-radius: 3px;
 }
 
-
-/* --- IMPROVED FORM STYLING --- */
-form {
-  max-width: 500px;
-  margin: 2rem auto;
-  background: #fff;
-  padding: 2.5rem;
-  border-radius: 15px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+::-webkit-scrollbar-thumb:hover {
+  background: #8c716b;
 }
 
-form label {
-  display: block;
-  margin-bottom: 0.5rem;
-  font-weight: 600;
-  color: #495057;
+/* ── Hide Scrollbar Utility ─────────────────────────────── */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
-form input,
-form textarea {
-  width: 100%;
-  padding: 0.8rem 1rem;
-  margin-bottom: 1.5rem;
-  border: 1px solid #ced4da;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-family: 'Poppins', sans-serif;
-  transition: border-color 0.3s, box-shadow 0.3s;
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
-form input:focus,
-form textarea:focus {
-  border-color: #6f42c1;
-  box-shadow: 0 0 0 3px rgba(111, 66, 193, 0.2);
-  outline: none;
+/* ── Horizontal Mask Edges (for filter scroll area) ──── */
+.mask-edges-x {
+  mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%);
 }
 
-form button {
-  background: linear-gradient(135deg, #8e44ad, #6f42c1);
-  color: white;
-  padding: 0.8rem 1.5rem;
-  border: none;
-  width: 100%;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.3s ease;
+/* ── Text Selection Styling ──────────────────────────── */
+::selection {
+  background-color: #ffdad3; /* primary-fixed */
+  color: #3e0500; /* on-primary-fixed */
 }
 
-form button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+/* ── Focus Ring Override ─────────────────────────────── */
+/* Use a warm focus ring instead of the default blue */
+:focus-visible {
+  outline: 2px solid #a6331b;
+  outline-offset: 2px;
 }
 
-.footer-links {
-  text-align: center;
-  margin-top: 2rem;
-}
-
-.footer-links a {
-  color: #6f42c1;
-}
-
-/* --- RESPONSIVE DESIGN --- */
-
-/* Media Queries for Mobile Devices */
-@media screen and (max-width: 768px) {
-  /* Header adjustments */
-  header {
-    padding: 1.5rem 1rem;
-    margin-bottom: 2rem;
+/* ── Animation: Fade In + Slide Up ───────────────────── */
+/* Used by recipe modal and toast notifications */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
   }
-
-  header h1 {
-    font-size: 1.8rem;
-  }
-
-  /* Navigation */
-  nav {
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  nav a {
-    margin: 0 0.5rem;
-    font-size: 0.9rem;
-  }
-
-  /* Main container */
-  main {
-    padding: 0.5rem;
-  }
-
-  main h2 {
-    font-size: 1.5rem;
-    margin-bottom: 1.5rem;
-  }
-
-  /* Recipe grid */
-  .recipe-grid {
-    grid-template-columns: 1fr;
-    gap: 1.5rem;
-  }
-
-  /* Recipe card */
-  .recipe-card h2 {
-    font-size: 1.2rem;
-    padding: 0.8rem 1rem;
-  }
-
-  /* Forms */
-  form {
-    padding: 1.5rem;
-    margin: 1rem auto;
-  }
-
-  form input,
-  form textarea {
-    font-size: 16px; /* Prevents zoom on iOS */
-  }
-
-  /* Nutrition grid */
-  .nutrition-grid {
-    grid-template-columns: 1fr;
-    gap: 0.8rem;
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-/* Media Queries for Small Mobile Devices */
-@media screen and (max-width: 480px) {
-  header {
-    padding: 1rem 0.5rem;
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes zoomIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.animate-in {
+  animation-fill-mode: both;
+}
+
+.fade-in {
+  animation-name: fadeIn;
+}
+
+.zoom-in {
+  animation-name: zoomIn;
+}
+
+.duration-300 {
+  animation-duration: 300ms;
+}
+
+/* ── Recipe Metronome: Strikethrough Ingredient ───────── */
+/* Interactive ingredient check-off (Courier Prime aesthetic) */
+.ingredient-checked {
+  text-decoration: line-through;
+  text-decoration-color: #a6331b;
+  color: #8c716b;
+  transition: color 0.2s ease, text-decoration-color 0.2s ease;
+}
+
+/* ── Print Styles ─────────────────────────────────────── */
+@media print {
+  nav,
+  .grain-overlay,
+  .editorial-shadow {
+    display: none !important;
   }
 
-  header h1 {
-    font-size: 1.5rem;
+  body {
+    background: white;
+    color: black;
   }
-
-  main h2 {
-    font-size: 1.3rem;
-  }
-
-  form {
-    padding: 1rem;
-  }
-
-  .recipe-card h2 {
-    font-size: 1.1rem;
-    padding: 0.7rem 0.8rem;
-  }
-}
-
-/* Tablet adjustments */
-@media screen and (min-width: 769px) and (max-width: 1024px) {
-  .recipe-grid {
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  }
-}
-
-/* Utility Classes for Responsive Design */
-.responsive-container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 1rem;
-}
-
-@media screen and (max-width: 768px) {
-  .responsive-container {
-    padding: 0.5rem;
-  }
-}
-
-.responsive-grid {
-  display: grid;
-  gap: 1.5rem;
-}
-
-.responsive-grid-2 {
-  grid-template-columns: repeat(2, 1fr);
-}
-
-.responsive-grid-3 {
-  grid-template-columns: repeat(3, 1fr);
-}
-
-.responsive-grid-4 {
-  grid-template-columns: repeat(4, 1fr);
-}
-
-@media screen and (max-width: 1024px) {
-  .responsive-grid-4 {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .responsive-grid-3 {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media screen and (max-width: 768px) {
-  .responsive-grid-2,
-  .responsive-grid-3,
-  .responsive-grid-4 {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* Responsive buttons */
-.btn-responsive {
-  width: 100%;
-  max-width: 300px;
-}
-
-@media screen and (max-width: 768px) {
-  .btn-responsive {
-    max-width: 100%;
-  }
-}
-
-/* Responsive text */
-@media screen and (max-width: 768px) {
-  h1 { font-size: 1.8rem !important; }
-  h2 { font-size: 1.5rem !important; }
-  h3 { font-size: 1.2rem !important; }
-  p { font-size: 0.95rem; }
 }

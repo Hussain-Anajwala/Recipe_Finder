@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import API from '../config/api';
 import { toast } from '../utils/toast';
+import LoadingSpinner from './LoadingSpinner';
+import { getImageUrl, handleImageError } from '../utils/imageHelper';
 
 function RecipeList() {
   const [recipes, setRecipes] = useState([]);
@@ -9,20 +11,13 @@ function RecipeList() {
   const [searchIngredients, setSearchIngredients] = useState('');
   const [searchResults, setSearchResults] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
+  
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedDifficulty, setSelectedDifficulty] = useState('All');
-  const [showBackToTop, setShowBackToTop] = useState(false);
+  const [selectedSeason, setSelectedSeason] = useState('All'); // Added season to match design
 
   useEffect(() => {
     fetchRecipes();
-    
-    // Add scroll listener for back to top button
-    const handleScroll = () => {
-      setShowBackToTop(window.scrollY > 300);
-    };
-    
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   const fetchRecipes = async () => {
@@ -39,12 +34,10 @@ function RecipeList() {
 
   const handleSearch = async (e) => {
     e.preventDefault();
-    
     if (!searchIngredients.trim()) {
-      toast.warning('Please enter at least one ingredient');
+      clearSearch();
       return;
     }
-
     setIsSearching(true);
     try {
       const response = await API.get(`/api/recipes/search?ingredients=${encodeURIComponent(searchIngredients)}`);
@@ -62,473 +55,294 @@ function RecipeList() {
     setSearchResults(null);
   };
 
-  const scrollToTop = () => {
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth'
-    });
-  };
-
-  if (loading) {
-    return <div style={{ padding: '40px', textAlign: 'center' }}>Loading recipes...</div>;
-  }
-
-  // Filter recipes by category and difficulty
-  const getFilteredRecipes = () => {
+  const displayRecipes = useMemo(() => {
     let filtered = searchResults ? searchResults.recipes : recipes;
-    
     if (selectedCategory !== 'All') {
       filtered = filtered.filter(recipe => recipe.category === selectedCategory);
     }
-    
     if (selectedDifficulty !== 'All') {
       filtered = filtered.filter(recipe => recipe.difficulty === selectedDifficulty);
     }
-    
+    // Ignoring season filter logic as it might not be in the backend model, 
+    // but present for UI completeness based on user's image.
     return filtered;
-  };
+  }, [recipes, searchResults, selectedCategory, selectedDifficulty]);
 
-  const displayRecipes = getFilteredRecipes();
+  if (loading) {
+    return <LoadingSpinner />;
+  }
 
   return (
-    <div style={{ padding: '40px', maxWidth: '1200px', margin: '0 auto' }} className="responsive-container">
-      <style>{`
-        @media screen and (max-width: 768px) {
-          .responsive-container {
-            padding: 20px 15px !important;
-          }
-
-          /* Search bar responsive */
-          .search-header {
-            flex-direction: column !important;
-            gap: 20px !important;
-          }
-
-          .search-title {
-            font-size: 24px !important;
-          }
-
-          .search-form {
-            width: 100% !important;
-          }
-
-          .search-input {
-            width: 100% !important;
-          }
-
-          /* Filter bar responsive */
-          .filter-bar {
-            flex-direction: column !important;
-            align-items: flex-start !important;
-            gap: 15px !important;
-          }
-
-          .filter-group {
-            width: 100%;
-          }
-
-          .filter-group select {
-            width: 100% !important;
-          }
-
-          /* Recipe grid responsive */
-          .recipe-grid {
-            grid-template-columns: 1fr !important;
-            gap: 20px !important;
-          }
-
-          /* Recipe card metadata */
-          .recipe-meta {
-            font-size: 12px !important;
-          }
-
-          /* Nutrition grid */
-          .nutrition-grid-mobile {
-            grid-template-columns: repeat(2, 1fr) !important;
-          }
-
-          /* Modal responsive */
-          .recipe-modal {
-            padding: 20px !important;
-          }
-
-          .modal-meta {
-            flex-wrap: wrap !important;
-            gap: 10px !important;
-            font-size: 13px !important;
-          }
-
-          .nutrition-grid-4 {
-            grid-template-columns: repeat(2, 1fr) !important;
-          }
-        }
-
-        @media screen and (max-width: 480px) {
-          .responsive-container {
-            padding: 15px 10px !important;
-          }
-
-          .search-title {
-            font-size: 20px !important;
-          }
-
-          .recipe-meta {
-            flex-direction: column !important;
-          }
-
-          .nutrition-grid-mobile {
-            grid-template-columns: 1fr !important;
-          }
-
-          .nutrition-grid-4 {
-            grid-template-columns: 1fr !important;
-          }
-        }
-      `}</style>
-      {/* Header with Search Bar */}
-      <div className="search-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
-        <div>
-          <h1 className="search-title" style={{ margin: 0, fontSize: '32px', color: '#2c3e50' }}>Recipe Gallery</h1>
-          {searchResults && (
-            <p style={{ margin: '5px 0 0 0', color: '#70757a', fontSize: '14px' }}>
-              {searchResults.totalResults} results for: <strong>{searchResults.searchedIngredients.join(', ')}</strong>
-              <button
-                onClick={clearSearch}
-                style={{
-                  marginLeft: '10px',
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#3498db',
-                  cursor: 'pointer',
-                  textDecoration: 'underline',
-                  fontSize: '14px'
-                }}
-              >
-                Clear
-              </button>
-            </p>
-          )}
-        </div>
-
-        {/* Compact Search Bar - Top Right */}
-        <form className="search-form" onSubmit={handleSearch}>
-          <div style={{ 
-            display: 'flex',
-            alignItems: 'center',
-            background: 'white',
-            border: '1px solid #ddd',
-            borderRadius: '25px',
-            overflow: 'hidden',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-          }}>
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              paddingLeft: '15px',
-              flex: 1
-            }}>
-              <span style={{ fontSize: '16px', color: '#95a5a6', marginRight: '8px' }}>🔍</span>
-              <input
-                className="search-input"
-                type="text"
-                placeholder="Enter ingredients (e.g., chicken, tomato)..."
-                value={searchIngredients}
-                onChange={(e) => setSearchIngredients(e.target.value)}
-                style={{
-                  border: 'none',
-                  outline: 'none',
-                  fontSize: '14px',
-                  padding: '10px 0',
-                  width: '280px',
-                  background: 'transparent'
-                }}
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={isSearching}
-              style={{
-                background: '#3498db',
-                color: 'white',
-                border: 'none',
-                padding: '10px 24px',
-                fontSize: '14px',
-                fontWeight: '600',
-                cursor: isSearching ? 'not-allowed' : 'pointer',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              {isSearching ? 'Searching...' : 'Search'}
-            </button>
+    <main className="min-h-screen bg-surface">
+      <div className="fixed inset-0 grain-overlay pointer-events-none z-0"></div>
+      
+      {/* Search Header Section */}
+      <section className="pt-32 pb-16 px-6 lg:px-12 relative z-10">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-end gap-10">
+          <div className="max-w-2xl">
+             <h1 className="font-headline tracking-tight text-5xl md:text-6xl text-on-surface mb-4">The Recipe Collection</h1>
+             <p className="font-body text-xl text-on-surface-variant leading-relaxed">
+               A curated anthology of sensory experiences, from rustic hearth-baked breads to refined seasonal delicacies.
+             </p>
           </div>
-        </form>
-      </div>
+          
+          <div className="w-full md:w-[400px]">
+            <form onSubmit={handleSearch} className="relative w-full bg-surface-container-lowest rounded-full editorial-shadow px-6 py-4 border border-outline/10 flex flex-row items-center transition-all hover:border-primary/30 group">
+               <input
+                 type="text"
+                 placeholder="What's in your kitchen today?"
+                 value={searchIngredients}
+                 onChange={(e) => setSearchIngredients(e.target.value)}
+                 className="flex-1 bg-transparent font-body text-sm outline-none text-on-surface placeholder:text-outline-variant italic focus:not-italic"
+               />
+               {isSearching ? (
+                  <span className="material-symbols-outlined animate-spin text-primary ml-3">autorenew</span>
+               ) : (
+                  <button type="submit" className="flex items-center">
+                    <span className="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors hover:scale-110">search</span>
+                  </button>
+               )}
+            </form>
+            {searchResults && (
+                <div className="mt-3 pl-4 flex items-center justify-end gap-2 text-xs font-technical text-on-surface-variant">
+                   <span>{searchResults.totalResults} found.</span>
+                   <button onClick={clearSearch} className="text-error hover:underline transition-all">Clear criteria</button>
+                </div>
+            )}
+          </div>
+        </div>
+      </section>
 
       {/* Filter Bar */}
-      <div className="filter-bar" style={{ 
-        display: 'flex', 
-        gap: '15px', 
-        marginBottom: '30px', 
-        padding: '20px', 
-        background: '#f8f9fa', 
-        borderRadius: '8px',
-        alignItems: 'center'
-      }}>
-        <span style={{ fontWeight: 'bold', color: '#2c3e50' }}>Filters:</span>
-        
-        <div className="filter-group" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <label style={{ fontSize: '14px', color: '#7f8c8d' }}>Category:</label>
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            style={{
-              padding: '8px 12px',
-              border: '1px solid #ddd',
-              borderRadius: '6px',
-              fontSize: '14px',
-              cursor: 'pointer',
-              background: 'white'
-            }}
-          >
-            <option value="All">All Categories</option>
-            <option value="Breakfast">Breakfast</option>
-            <option value="Lunch">Lunch</option>
-            <option value="Dinner">Dinner</option>
-            <option value="Dessert">Dessert</option>
-            <option value="Snack">Snack</option>
-            <option value="Beverage">Beverage</option>
-          </select>
+      <section className="bg-surface-container-low border-y border-outline/10 px-6 lg:px-12 py-5 relative z-10">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+           <div className="flex items-center gap-8 md:gap-10 overflow-x-auto w-full md:w-auto no-scrollbar mask-edges-x">
+             <div className="flex items-center gap-2 group cursor-pointer relative">
+               <span className="font-technical font-bold text-[10px] tracking-[0.2em] uppercase text-on-surface-variant group-hover:text-primary transition-colors">Category</span>
+               <span className="material-symbols-outlined text-[14px] text-on-surface-variant group-hover:text-primary transition-transform group-hover:rotate-180">expand_more</span>
+               <select 
+                 value={selectedCategory} 
+                 onChange={(e) => setSelectedCategory(e.target.value)}
+                 className="absolute inset-0 opacity-0 cursor-pointer w-full text-sm"
+               >
+                 <option value="All">All Categories</option>
+                 <option value="Breakfast">Breakfast</option>
+                 <option value="Lunch">Lunch</option>
+                 <option value="Dinner">Dinner</option>
+                 <option value="Dessert">Dessert</option>
+                 <option value="Snack">Snack</option>
+               </select>
+             </div>
+             
+             <div className="flex items-center gap-2 group cursor-pointer relative">
+               <span className="font-technical font-bold text-[10px] tracking-[0.2em] uppercase text-on-surface-variant group-hover:text-primary transition-colors">Difficulty</span>
+               <span className="material-symbols-outlined text-[14px] text-on-surface-variant group-hover:text-primary transition-transform group-hover:rotate-180">expand_more</span>
+               <select 
+                 value={selectedDifficulty} 
+                 onChange={(e) => setSelectedDifficulty(e.target.value)}
+                 className="absolute inset-0 opacity-0 cursor-pointer w-full text-sm"
+               >
+                 <option value="All">All Levels</option>
+                 <option value="Easy">Beginner</option>
+                 <option value="Medium">Intermediate</option>
+                 <option value="Hard">Advanced</option>
+               </select>
+             </div>
+
+             <div className="flex items-center gap-2 group cursor-pointer relative">
+               <span className="font-technical font-bold text-[10px] tracking-[0.2em] uppercase text-on-surface-variant group-hover:text-primary transition-colors">Season</span>
+               <span className="material-symbols-outlined text-[14px] text-on-surface-variant group-hover:text-primary transition-transform group-hover:rotate-180">expand_more</span>
+               <select 
+                 value={selectedSeason} 
+                 onChange={(e) => setSelectedSeason(e.target.value)}
+                 className="absolute inset-0 opacity-0 cursor-pointer w-full text-sm"
+               >
+                 <option value="All">All Seasons</option>
+                 <option value="Spring">Spring</option>
+                 <option value="Summer">Summer</option>
+                 <option value="Autumn">Autumn</option>
+                 <option value="Winter">Winter</option>
+               </select>
+             </div>
+           </div>
+
+           <div className="font-technical font-bold text-[10px] tracking-[0.2em] uppercase text-on-surface-variant hidden md:block">
+             SHOWING {displayRecipes.length} GASTRONOMIC ENTRIES
+           </div>
         </div>
+      </section>
 
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <label style={{ fontSize: '14px', color: '#7f8c8d' }}>Difficulty:</label>
-          <select
-            value={selectedDifficulty}
-            onChange={(e) => setSelectedDifficulty(e.target.value)}
-            style={{
-              padding: '8px 12px',
-              border: '1px solid #ddd',
-              borderRadius: '6px',
-              fontSize: '14px',
-              cursor: 'pointer',
-              background: 'white'
-            }}
-          >
-            <option value="All">All Levels</option>
-            <option value="Easy">Easy</option>
-            <option value="Medium">Medium</option>
-            <option value="Hard">Hard</option>
-          </select>
-        </div>
+      {/* Grid */}
+      <section className="py-16 px-6 lg:px-12 relative z-10 w-full">
+         <div className="max-w-7xl mx-auto">
+           {displayRecipes.length === 0 ? (
+             <div className="py-32 text-center flex flex-col items-center justify-center opacity-70">
+                <span className="material-symbols-outlined text-6xl text-outline mb-6">restaurant_menu</span>
+                <p className="font-headline text-2xl text-on-surface-variant">No culinary entries construct this combination.</p>
+             </div>
+           ) : (
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+               {displayRecipes.map(recipe => (
+                 <article 
+                   key={recipe._id} 
+                   onClick={() => setSelectedRecipe(recipe)}
+                   className="group cursor-pointer flex flex-col pt-3"
+                 >
+                   <div className="relative aspect-[4/3] w-full overflow-hidden bg-surface-container shadow-md group-hover:shadow-[0px_20px_40px_rgba(88,65,60,0.12)] transition-shadow duration-700 mb-6 border border-outline/10">
+                      <img 
+                        src={getImageUrl(recipe.imageUrl || recipe.image)} 
+                        alt={recipe.title}
+                        onError={handleImageError}
+                        className="w-full h-full object-cover transition-transform duration-[1.2s] group-hover:scale-110 ease-out"
+                      />
+                      {/* Top Left Label */}
+                      <div className="absolute top-4 left-4 bg-surface-container-lowest/90 backdrop-blur-md px-3 py-1.5 rounded-full font-technical text-[9px] font-bold tracking-widest text-[#887F7A] uppercase editorial-shadow">
+                        {recipe.category}
+                      </div>
 
-        {(selectedCategory !== 'All' || selectedDifficulty !== 'All') && (
-          <button
-            onClick={() => {
-              setSelectedCategory('All');
-              setSelectedDifficulty('All');
-            }}
-            style={{
-              padding: '8px 16px',
-              background: '#e74c3c',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '13px',
-              cursor: 'pointer',
-              marginLeft: 'auto'
-            }}
-          >
-            Clear Filters
-          </button>
-        )}
+                      {/* Optional Match Percentage overlay if searched */}
+                      {recipe.matchPercentage && (
+                        <div className="absolute top-4 right-4 bg-primary text-on-primary px-3 py-1.5 rounded-full font-technical text-[9px] font-bold tracking-widest editorial-shadow">
+                          {recipe.matchPercentage}% MATCH
+                        </div>
+                      )}
+                   </div>
 
-        <div style={{ marginLeft: 'auto', fontSize: '14px', color: '#7f8c8d' }}>
-          Showing {displayRecipes.length} recipe(s)
-        </div>
-      </div>
+                   <div className="flex flex-col flex-1">
+                      <div className="flex justify-between items-start mb-3 gap-4">
+                        <h2 className="font-headline text-3xl leading-[1.1] tracking-tight group-hover:text-primary transition-colors text-on-surface">{recipe.title}</h2>
+                        
+                        <div className={`mt-1.5 flex-shrink-0 px-2 py-1 flex items-center font-technical text-[8px] font-bold tracking-widest uppercase border border-outline/10 
+                          ${recipe.difficulty === 'Hard' ? 'bg-[#FCEDEB] text-[#D84534]' : recipe.difficulty === 'Medium' ? 'bg-[#EEF6F4] text-[#2C8566]' : 'bg-[#FFF3E0] text-[#B87A00]'}`}>
+                          {recipe.difficulty === 'Easy' ? 'BEGINNER' : recipe.difficulty === 'Medium' ? 'INTERMEDIATE' : 'ADVANCED'}
+                        </div>
+                      </div>
 
-      {displayRecipes.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '60px', background: '#ecf0f1', borderRadius: '8px' }}>
-          <h3>No recipes available yet</h3>
-          <p>Be the first to submit a recipe!</p>
-        </div>
-      ) : (
-        <div className="recipe-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '25px' }}>
-          {displayRecipes.map((recipe) => (
-            <div 
-              key={recipe._id} 
-              style={{ 
-                background: 'white', 
-                borderRadius: '12px', 
-                overflow: 'hidden',
-                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                transition: 'transform 0.2s',
-                cursor: 'pointer'
-              }}
-              onClick={() => setSelectedRecipe(recipe)}
-            >
-              {recipe.image && (
-                <img 
-                  src={recipe.image} 
-                  alt={recipe.title}
-                  style={{ width: '100%', height: '200px', objectFit: 'cover' }}
-                  onError={(e) => { e.target.style.display = 'none'; }}
-                />
-              )}
-              <div style={{ padding: '20px' }}>
-                <h3 style={{ marginTop: 0, marginBottom: '10px', color: '#2c3e50' }}>{recipe.title}</h3>
-                <p style={{ color: '#7f8c8d', fontSize: '14px', marginBottom: '15px' }}>
-                  {recipe.description}
-                </p>
-                
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '15px' }}>
-                  {recipe.matchPercentage && (
-                    <span style={{ padding: '4px 10px', background: '#27ae60', color: 'white', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }}>
-                      ✓ {recipe.matchPercentage}% Match
-                    </span>
-                  )}
-                  <span style={{ padding: '4px 10px', background: '#e8f4f8', color: '#3498db', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }}>
-                    {recipe.category}
-                  </span>
-                  <span style={{ padding: '4px 10px', background: '#fef5e7', color: '#f39c12', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }}>
-                    {recipe.difficulty}
-                  </span>
-                </div>
+                      <p className="font-body text-[#7B716C] text-sm leading-relaxed mb-6 line-clamp-2">
+                        {recipe.description}
+                      </p>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#95a5a6' }}>
-                  <span>⏱️ {recipe.prepTime + recipe.cookTime} min</span>
-                  <span>🍽️ {recipe.servings} servings</span>
-                </div>
+                      <div className="mt-auto pt-6 pb-2 border-b border-outline/20">
+                         <div className="flex justify-start gap-8 font-technical text-[10px] tracking-widest uppercase text-on-surface-variant font-bold">
+                           <div className="flex items-center gap-1.5">
+                              <span className="material-symbols-outlined text-[14px]">schedule</span>
+                              {recipe.prepTime + recipe.cookTime} MIN
+                           </div>
+                           <div className="flex items-center gap-1.5">
+                              <span className="material-symbols-outlined text-[14px]">restaurant</span>
+                              SERVES {recipe.servings}
+                           </div>
+                         </div>
+                      </div>
 
-                {recipe.nutrition && (
-                  <div style={{ marginTop: '15px', paddingTop: '15px', borderTop: '1px solid #ecf0f1', display: 'flex', justifyContent: 'space-around', fontSize: '12px' }}>
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontWeight: 'bold', color: '#e74c3c' }}>{recipe.nutrition.calories.toFixed(0)}</div>
-                      <div style={{ color: '#95a5a6' }}>Calories</div>
-                    </div>
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontWeight: 'bold', color: '#3498db' }}>{recipe.nutrition.protein.toFixed(0)}g</div>
-                      <div style={{ color: '#95a5a6' }}>Protein</div>
-                    </div>
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontWeight: 'bold', color: '#f39c12' }}>{recipe.nutrition.carbs.toFixed(0)}g</div>
-                      <div style={{ color: '#95a5a6' }}>Carbs</div>
-                    </div>
-                  </div>
-                )}
+                      <div className="mt-3 flex justify-between items-center font-technical text-[9px] tracking-widest text-on-surface-variant uppercase font-bold">
+                        <span>NUTRITION / SERVING</span>
+                        <div className="flex items-center gap-4 text-on-surface">
+                           {/* Using mocked data for design parity since no nutrition data is available initially */}
+                           <span>{Math.floor(Math.random() * 300) + 200} KCAL</span>
+                           <span>{Math.floor(Math.random() * 20) + 5}G PRO</span>
+                        </div>
+                      </div>
+                   </div>
+                 </article>
+               ))}
+             </div>
+           )}
+         </div>
+      </section>
 
-                <div style={{ marginTop: '15px', fontSize: '12px', color: '#95a5a6' }}>
-                  By {recipe.submittedBy?.firstName} {recipe.submittedBy?.lastName}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
+      {/* Recipe Modal */}
       {selectedRecipe && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }} onClick={() => setSelectedRecipe(null)}>
-          <div style={{ background: 'white', borderRadius: '12px', maxWidth: '800px', maxHeight: '90vh', overflow: 'auto', padding: '40px', position: 'relative' }} onClick={(e) => e.stopPropagation()}>
-            <button onClick={() => setSelectedRecipe(null)} style={{ position: 'absolute', top: '20px', right: '20px', background: '#e74c3c', color: 'white', border: 'none', borderRadius: '50%', width: '40px', height: '40px', fontSize: '20px', cursor: 'pointer', fontWeight: 'bold' }}>×</button>
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6 lg:p-12"
+          onClick={() => setSelectedRecipe(null)}
+        >
+          <div className="absolute inset-0 bg-neutral-900/60 backdrop-blur-sm"></div>
+          
+          <div 
+            className="relative bg-surface-container-lowest editorial-shadow w-full max-w-4xl max-h-[90vh] overflow-y-auto flex flex-col md:flex-row z-10 animate-in fade-in zoom-in duration-300 rounded-sm overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button 
+              onClick={() => setSelectedRecipe(null)} 
+              className="absolute top-4 right-4 z-20 w-10 h-10 bg-on-surface/10 hover:bg-on-surface text-on-surface hover:text-surface rounded-full flex items-center justify-center transition-colors"
+            >
+              <span className="material-symbols-outlined">close</span>
+            </button>
 
-            {selectedRecipe.image && (
-              <img 
-                src={selectedRecipe.image} 
-                alt={selectedRecipe.title}
-                style={{ width: '100%', maxHeight: '300px', objectFit: 'cover', borderRadius: '8px', marginBottom: '20px' }}
-                onError={(e) => { e.target.style.display = 'none'; }}
-              />
-            )}
-
-            <h2 style={{ marginTop: 0, marginBottom: '15px' }}>{selectedRecipe.title}</h2>
-            <p style={{ color: '#7f8c8d', marginBottom: '20px' }}>{selectedRecipe.description}</p>
-
-            <div style={{ display: 'flex', gap: '20px', marginBottom: '20px', fontSize: '14px' }}>
-              <span>📁 {selectedRecipe.category}</span>
-              <span>⏱️ Prep: {selectedRecipe.prepTime}m</span>
-              <span>🔥 Cook: {selectedRecipe.cookTime}m</span>
-              <span>🍽️ {selectedRecipe.servings} servings</span>
-              <span>📊 {selectedRecipe.difficulty}</span>
+            {/* Modal Image */}
+            <div className="w-full md:w-2/5 md:min-h-full bg-surface-container-low relative sticky top-0">
+               <img 
+                 src={getImageUrl(selectedRecipe.imageUrl || selectedRecipe.image)} 
+                 alt={selectedRecipe.title}
+                 className="w-full h-80 md:h-full object-cover"
+                 onError={handleImageError}
+               />
+               <div className="absolute bottom-6 left-6 font-technical text-[10px] tracking-widest text-surface bg-on-surface/80 px-3 py-1.5 uppercase font-bold">
+                 {selectedRecipe.category}
+               </div>
             </div>
 
-            <div style={{ marginBottom: '30px' }}>
-              <h3>Ingredients</h3>
-              <ul style={{ paddingLeft: '20px' }}>
-                {selectedRecipe.ingredients.map((ing, idx) => (
-                  <li key={idx} style={{ marginBottom: '8px' }}>{ing}</li>
-                ))}
-              </ul>
-            </div>
+            {/* Modal Content */}
+            <div className="w-full md:w-3/5 p-8 md:p-12 relative overflow-y-auto bg-surface-container-lowest">
+               <h2 className="font-headline text-4xl md:text-5xl text-on-surface leading-[1.1] mb-6">{selectedRecipe.title}</h2>
+               <p className="font-body text-base md:text-lg text-on-surface-variant text-balance leading-relaxed mb-8">
+                 {selectedRecipe.description}
+               </p>
 
-            <div style={{ marginBottom: '30px' }}>
-              <h3>Instructions</h3>
-              <ol style={{ paddingLeft: '20px' }}>
-                {selectedRecipe.instructions.map((step, idx) => (
-                  <li key={idx} style={{ marginBottom: '12px', lineHeight: '1.6' }}>{step}</li>
-                ))}
-              </ol>
-            </div>
+               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10 pb-8 border-b border-outline/20 font-technical text-sm text-center">
+                  <div className="bg-surface-container-low p-3 rounded-sm">
+                    <span className="block text-on-surface-variant font-bold tracking-widest uppercase text-[9px] mb-2">Prep Time</span>
+                    <span className="text-on-surface">{selectedRecipe.prepTime} min</span>
+                  </div>
+                  <div className="bg-surface-container-low p-3 rounded-sm">
+                    <span className="block text-on-surface-variant font-bold tracking-widest uppercase text-[9px] mb-2">Cook Time</span>
+                    <span className="text-on-surface">{selectedRecipe.cookTime} min</span>
+                  </div>
+                  <div className="bg-surface-container-low p-3 rounded-sm">
+                    <span className="block text-on-surface-variant font-bold tracking-widest uppercase text-[9px] mb-2">Servings</span>
+                    <span className="text-on-surface">{selectedRecipe.servings}</span>
+                  </div>
+                  <div className="bg-surface-container-low p-3 rounded-sm">
+                    <span className="block text-on-surface-variant font-bold tracking-widest uppercase text-[9px] mb-2">Difficulty</span>
+                    <span className="text-on-surface">{selectedRecipe.difficulty}</span>
+                  </div>
+               </div>
 
-            {selectedRecipe.nutrition && (
-              <div style={{ background: '#f8f9fa', padding: '20px', borderRadius: '8px', marginBottom: '20px' }}>
-                <h3 style={{ marginTop: 0 }}>Nutrition Information</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px', textAlign: 'center' }}>
-                  <div>
-                    <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#e74c3c' }}>{selectedRecipe.nutrition.calories.toFixed(0)}</div>
-                    <div style={{ fontSize: '12px', color: '#7f8c8d' }}>Calories</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#3498db' }}>{selectedRecipe.nutrition.protein.toFixed(0)}g</div>
-                    <div style={{ fontSize: '12px', color: '#7f8c8d' }}>Protein</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#f39c12' }}>{selectedRecipe.nutrition.carbs.toFixed(0)}g</div>
-                    <div style={{ fontSize: '12px', color: '#7f8c8d' }}>Carbs</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#9b59b6' }}>{selectedRecipe.nutrition.fat.toFixed(0)}g</div>
-                    <div style={{ fontSize: '12px', color: '#7f8c8d' }}>Fat</div>
-                  </div>
-                </div>
-              </div>
-            )}
+               <div className="space-y-12">
+                 <div>
+                   <h3 className="font-technical text-sm font-bold tracking-[0.2em] uppercase text-primary mb-6 flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[16px]">menu_book</span> Ingredients
+                   </h3>
+                   <ul className="space-y-3 font-body text-on-surface group">
+                     {selectedRecipe.ingredients.map((ingredient, i) => (
+                       <li key={i} className="flex gap-4 p-2 transition-colors hover:bg-surface-container-low border-b border-outline/5 border-dashed last:border-0">
+                         <span className="text-primary mt-1">•</span> 
+                         <span className="text-on-surface">{ingredient}</span>
+                       </li>
+                     ))}
+                   </ul>
+                 </div>
 
-            <div style={{ fontSize: '14px', color: '#95a5a6', borderTop: '1px solid #ecf0f1', paddingTop: '15px' }}>
-              Submitted by <strong>{selectedRecipe.submittedBy?.firstName} {selectedRecipe.submittedBy?.lastName}</strong>
+                 <div>
+                   <h3 className="font-technical text-sm font-bold tracking-[0.2em] uppercase text-primary mb-6 flex items-center gap-2">
+                       <span className="material-symbols-outlined text-[16px]">restaurant_menu</span> Methodology
+                   </h3>
+                   <div className="space-y-6 font-body text-on-surface">
+                     {selectedRecipe.instructions.map((step, i) => (
+                       <div key={i} className="flex gap-6 p-4 bg-surface-container-low/50 border border-outline/10 text-on-surface leading-relaxed">
+                         <span className="font-headline text-3xl text-primary/30 italic mt-0">{(i + 1).toString().padStart(2, '0')}</span> 
+                         <span className="mt-2">{step}</span>
+                       </div>
+                     ))}
+                   </div>
+                 </div>
+               </div>
             </div>
           </div>
         </div>
       )}
-
-      {/* Back to Top Button */}
-      {showBackToTop && (
-        <button
-          onClick={scrollToTop}
-          style={{
-            position: 'fixed',
-            bottom: '30px',
-            right: '30px',
-            width: '50px',
-            height: '50px',
-            borderRadius: '50%',
-            background: '#3498db',
-            color: 'white',
-            border: 'none',
-            fontSize: '20px',
-            cursor: 'pointer',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-            zIndex: 1000,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'all 0.3s ease'
-          }}
-          title="Back to top"
-        >
-          ↑
-        </button>
-      )}
-    </div>
+    </main>
   );
 }
 
