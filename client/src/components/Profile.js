@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+
 import API from '../config/api';
 import { toast } from '../utils/toast';
 import LoadingSpinner from './LoadingSpinner';
 
 function Profile() {
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [profileData, setProfileData] = useState({
     firstName: '',
