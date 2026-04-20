@@ -19,6 +19,7 @@ const recipeSchema = new Schema({
   },
   submittedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   reviewedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+  reviewedAt: { type: Date },
   adminNotes: { type: String },
   nutrition: {
     calories: { type: Number, default: 0 },

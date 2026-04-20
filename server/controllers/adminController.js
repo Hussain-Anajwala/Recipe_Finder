@@ -34,23 +34,23 @@ export const getAllSubmissions = async (req, res) => {
     const filter = status ? { status } : {};
 
     const recipes = await Recipe.find(filter)
-      .populate({ path: 'submittedBy', select: 'firstName lastName email', options: { strictPopulate: false } })
-      .populate({ path: 'reviewedBy',  select: 'firstName lastName',        options: { strictPopulate: false } })
+      .populate({ path: 'submittedBy', select: 'firstName lastName email', strictPopulate: false })
+      .populate({ path: 'reviewedBy',  select: 'firstName lastName',        strictPopulate: false })
       .sort({ createdAt: -1 });
 
-    // Gracefully handle orphaned references (user was deleted after submitting)
+    // Map null submittedBy to a fallback so frontend doesn't crash on orphaned refs
     const safeRecipes = recipes.map(r => {
-      const obj = r.toObject();
+      const obj = r.toObject({ virtuals: true });
       if (!obj.submittedBy) {
         obj.submittedBy = { firstName: 'Deleted', lastName: 'User', email: '' };
       }
       return obj;
     });
 
-    res.json(safeRecipes);
+    return res.json(safeRecipes);
   } catch (error) {
     console.error('[getAllSubmissions]', error.stack);
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 };
 
@@ -58,8 +58,6 @@ export const getAllSubmissions = async (req, res) => {
 // @route   PUT /api/admin/submissions/:id/approve
 export const approveRecipe = async (req, res) => {
   try {
-    const { adminNotes } = req.body;
-
     const recipe = await Recipe.findById(req.params.id);
 
     if (!recipe) {
@@ -67,14 +65,15 @@ export const approveRecipe = async (req, res) => {
     }
 
     recipe.status = 'approved';
-    recipe.reviewedBy = req.user._id; // use ._id (ObjectId) not .id (string)
-    recipe.adminNotes = adminNotes || '';
+    recipe.reviewedBy = req.user._id;
+    recipe.adminNotes = req.body.adminNotes || '';
+    recipe.reviewedAt = new Date();
 
     const updatedRecipe = await recipe.save();
-    res.json(updatedRecipe);
+    return res.status(200).json(updatedRecipe);
   } catch (error) {
-    console.error('[approveRecipe]', error.stack);
-    res.status(500).json({ error: error.message });
+    console.error('approveRecipe error:', error.stack);
+    return res.status(500).json({ error: error.message });
   }
 };
 
@@ -82,8 +81,6 @@ export const approveRecipe = async (req, res) => {
 // @route   PUT /api/admin/submissions/:id/reject
 export const rejectRecipe = async (req, res) => {
   try {
-    const { adminNotes } = req.body;
-
     const recipe = await Recipe.findById(req.params.id);
 
     if (!recipe) {
@@ -91,14 +88,15 @@ export const rejectRecipe = async (req, res) => {
     }
 
     recipe.status = 'rejected';
-    recipe.reviewedBy = req.user._id; // use ._id (ObjectId) not .id (string)
-    recipe.adminNotes = adminNotes || '';
+    recipe.reviewedBy = req.user._id;
+    recipe.adminNotes = req.body.adminNotes || '';
+    recipe.reviewedAt = new Date();
 
     const updatedRecipe = await recipe.save();
-    res.json(updatedRecipe);
+    return res.status(200).json(updatedRecipe);
   } catch (error) {
-    console.error('[rejectRecipe]', error.stack);
-    res.status(500).json({ error: error.message });
+    console.error('rejectRecipe error:', error.stack);
+    return res.status(500).json({ error: error.message });
   }
 };
 

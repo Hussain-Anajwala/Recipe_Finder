@@ -193,14 +193,11 @@ export const editMyRecipe = async (req, res) => {
   }
 };
 
-// @desc    Search recipes by ingredients (Feature 2: with threshold filtering)
-// @route   GET /api/recipes/search?ingredients=chicken,tomato&threshold=30
+// @desc    Search recipes by ingredients (Feature 2: pantry match)
+// @route   GET /api/recipes/search?ingredients=chicken,tomato
 export const searchRecipesByIngredients = async (req, res) => {
-  // ── Tunable constant: minimum % of recipe ingredients user must have ──
-  const MIN_COVERAGE_THRESHOLD = 30;
-
   try {
-    const { ingredients, threshold } = req.query;
+    const { ingredients } = req.query;
 
     if (!ingredients) {
       return res.status(400).json({ message: 'Please provide ingredients to search' });
@@ -215,16 +212,20 @@ export const searchRecipesByIngredients = async (req, res) => {
       return res.status(400).json({ message: 'Please provide valid ingredients' });
     }
 
-    // User-supplied threshold — floored at MIN_COVERAGE_THRESHOLD
-    const requestedThreshold = Math.min(100, Math.max(0, parseInt(threshold) || MIN_COVERAGE_THRESHOLD));
-    const thresholdValue = Math.max(MIN_COVERAGE_THRESHOLD, requestedThreshold);
+    console.log('[search] searchIngredients:', searchIngredients);
+
+    // Escape regex special characters in each ingredient, then join with |
+    // This prevents characters like '(' or '+' from breaking the whole query
+    const escapedPattern = searchIngredients
+      .map(i => i.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      .join('|');
 
     // Find approved recipes that contain ANY of the searched ingredients
     const recipes = await Recipe.find({
       status: 'approved',
       ingredients: {
         $elemMatch: {
-          $regex: searchIngredients.join('|'),
+          $regex: escapedPattern,
           $options: 'i'
         }
       }
@@ -232,57 +233,44 @@ export const searchRecipesByIngredients = async (req, res) => {
     .populate('submittedBy', 'firstName lastName')
     .sort({ createdAt: -1 });
 
-    // Calculate match scores
+    console.log('[search] DB candidates returned:', recipes.length);
+
+    // Calculate match scores for every candidate
     const recipesWithScore = recipes.map(recipe => {
       const recipeIngs = recipe.ingredients;
       let matchCount = 0;
-      const matchedIngredients = [];
 
       recipeIngs.forEach(recipeIng => {
         const hasMatch = searchIngredients.some(searchIng =>
           recipeIng.toLowerCase().includes(searchIng)
         );
-        if (hasMatch) {
-          matchCount++;
-          matchedIngredients.push(recipeIng);
-        }
+        if (hasMatch) matchCount++;
       });
 
-      // ── Score A: ingredientCoverage — how much of this recipe can the user make?
-      //    matchCount / recipe ingredient count × 100
+      // Score A: how much of this recipe can the user make?
       const matchPercentage = Math.round((matchCount / recipeIngs.length) * 100);
 
-      // ── Score B: pantryUtilization — how many pantry items does this recipe use?
-      //    matchCount / user's pantry size × 100
+      // Score B: how many of the user's pantry items does this recipe use?
       const pantryUtilization = Math.round((matchCount / searchIngredients.length) * 100);
 
       return {
         ...recipe.toObject(),
         matchScore: matchCount,
-        matchPercentage,       // primary sort key — ingredient coverage
-        pantryUtilization,     // secondary metric — pantry items consumed
+        matchPercentage,
+        pantryUtilization,
         totalIngredients: recipeIngs.length,
-        matchedIngredients,
-        searchedIngredients: searchIngredients,
       };
     });
 
-    // Filter: user must cover at least MIN_COVERAGE_THRESHOLD% of recipe ingredients
-    const filtered = recipesWithScore.filter(r => r.matchPercentage >= thresholdValue);
+    // Return ALL matches — no threshold filter, sort best coverage first
+    recipesWithScore.sort((a, b) => b.matchPercentage - a.matchPercentage);
 
-    // Sort by ingredientCoverage descending (highest coverage = most makeable recipe first)
-    filtered.sort((a, b) => b.matchPercentage - a.matchPercentage);
-
-    // Ethics: always tell user how many were hidden
-    const hiddenCount = recipesWithScore.length - filtered.length;
+    console.log('[search] results after scoring:', recipesWithScore.length);
 
     res.json({
       searchedIngredients: searchIngredients,
-      totalResults: filtered.length,
-      totalBeforeFilter: recipesWithScore.length,
-      hiddenByThreshold: recipesWithScore.length - filtered.length,
-      threshold_used: thresholdValue,
-      recipes: filtered,
+      totalResults: recipesWithScore.length,
+      recipes: recipesWithScore,
     });
 
   } catch (error) {
