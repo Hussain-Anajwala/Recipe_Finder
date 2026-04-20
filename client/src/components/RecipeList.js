@@ -805,7 +805,7 @@ function RecipeList() {
                     )}
                   </div>
                 </article>
-                )}
+                ))}
               </div>
 
               {/* Pagination controls */}
