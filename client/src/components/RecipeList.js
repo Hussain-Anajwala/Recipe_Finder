@@ -209,6 +209,10 @@ const RecommendationRow = ({ recipeId, onSelectRecipe }) => {
 function RecipeList() {
   const { user } = useAuth();
 
+  // Pagination
+  const RECIPES_PER_PAGE = 9;
+  const [currentPage, setCurrentPage] = useState(1);
+
   // Core state
   const [recipes, setRecipes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -408,19 +412,29 @@ function RecipeList() {
     }
   };
 
-  // ── Display logic (original + dietary filter) ──────────────
+  // ── Display logic (original + dietary filter + pagination) ───
   const displayRecipes = useMemo(() => {
     let filtered = searchResults ? searchResults.recipes || [] : recipes;
     if (selectedCategory !== 'All') filtered = filtered.filter(r => r.category === selectedCategory);
     if (selectedDifficulty !== 'All') filtered = filtered.filter(r => r.difficulty === selectedDifficulty);
     if (activeDietaryTags.length > 0) {
-      // Uses AI tags if available, falls back to ingredient keyword analysis
       filtered = filtered.filter(r =>
         activeDietaryTags.every(tag => recipeMatchesDietaryFilter(r, tag))
       );
     }
     return filtered;
   }, [recipes, searchResults, selectedCategory, selectedDifficulty, activeDietaryTags]);
+
+  // Reset to page 1 whenever the filtered set changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [displayRecipes]);
+
+  const totalPages = Math.max(1, Math.ceil(displayRecipes.length / RECIPES_PER_PAGE));
+  const paginatedRecipes = displayRecipes.slice(
+    (currentPage - 1) * RECIPES_PER_PAGE,
+    currentPage * RECIPES_PER_PAGE
+  );
 
   // ── Keyboard dismiss ────────────────────────────────────────
   useEffect(() => {
@@ -644,7 +658,7 @@ function RecipeList() {
             </div>
 
             <div className="font-technical font-bold text-[10px] tracking-[0.2em] uppercase text-on-surface-variant hidden md:block">
-              SHOWING {displayRecipes.length} GASTRONOMIC ENTRIES
+              SHOWING {paginatedRecipes.length} OF {displayRecipes.length} GASTRONOMIC ENTRIES
             </div>
           </div>
 
@@ -694,8 +708,9 @@ function RecipeList() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-              {displayRecipes.map(recipe => (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+                {paginatedRecipes.map(recipe => (
                 <article
                   key={recipe._id}
                   onClick={() => setSelectedRecipe(recipe)}
@@ -790,8 +805,61 @@ function RecipeList() {
                     )}
                   </div>
                 </article>
-              ))}
-            </div>
+                )}
+              </div>
+
+              {/* Pagination controls */}
+              {totalPages > 1 && (
+                <div className="mt-16 flex flex-col items-center gap-4">
+                  <div className="flex items-center gap-2 font-technical text-xs">
+                    <button
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="px-4 py-2 border border-outline-variant/50 text-on-surface-variant hover:text-on-surface hover:border-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      ← Previous
+                    </button>
+
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                      .reduce((acc, p, idx, arr) => {
+                        if (idx > 0 && p - arr[idx - 1] > 1) acc.push('...');
+                        acc.push(p);
+                        return acc;
+                      }, [])
+                      .map((p, i) =>
+                        p === '...' ? (
+                          <span key={`ellipsis-${i}`} className="px-2 py-2 text-outline">…</span>
+                        ) : (
+                          <button
+                            key={p}
+                            onClick={() => setCurrentPage(p)}
+                            className={`px-3 py-1 font-technical text-xs transition-colors ${
+                              currentPage === p
+                                ? 'bg-primary text-on-primary'
+                                : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low'
+                            }`}
+                          >
+                            {p}
+                          </button>
+                        )
+                      )
+                    }
+
+                    <button
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      className="px-4 py-2 border border-outline-variant/50 text-on-surface-variant hover:text-on-surface hover:border-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      Next →
+                    </button>
+                  </div>
+                  <p className="font-technical text-xs text-outline uppercase tracking-widest">
+                    Page {currentPage} of {totalPages} · {displayRecipes.length} recipes
+                  </p>
+                </div>
+              )}
+            </>
           )}
         </div>
       </section>

@@ -6,26 +6,26 @@ import User from '../models/User.js';
 export const protect = async (req, res, next) => {
   let token;
 
-  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+  if (req.headers.authorization?.startsWith('Bearer')) {
     try {
-      // Get token from header
       token = req.headers.authorization.split(' ')[1];
 
-      // Verify token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-      // Get user from the token's ID and attach it to the request
       req.user = await User.findById(decoded.id).select('-password');
 
-      next(); // Proceed to the next step
-    } catch (error) {
-      console.error(error);
-      res.status(401).json({ message: 'Not authorized, token failed' });
-    }
-  }
+      // Guard: user deleted after token was issued
+      if (!req.user) {
+        return res.status(401).json({ message: 'User no longer exists. Please log in again.' });
+      }
 
-  if (!token) {
-    res.status(401).json({ message: 'Not authorized, no token' });
+      next();
+    } catch (error) {
+      console.error('Auth middleware error:', error.stack);
+      return res.status(401).json({ message: 'Not authorized, token failed' });
+    }
+  } else {
+    return res.status(401).json({ message: 'Not authorized, no token' });
   }
 };
 

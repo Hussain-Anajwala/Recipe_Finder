@@ -58,22 +58,41 @@ export const getAllSubmissions = async (req, res) => {
 // @route   PUT /api/admin/submissions/:id/approve
 export const approveRecipe = async (req, res) => {
   try {
+    console.log('=== APPROVE RECIPE CALLED ===');
+    console.log('Recipe ID:', req.params.id);
+    console.log('req.user:', req.user);
+
+    if (!req.user) {
+      return res.status(401).json({ message: 'User not found in request' });
+    }
+
     const recipe = await Recipe.findById(req.params.id);
+    console.log('Recipe found:', recipe ? recipe.title : 'NOT FOUND');
 
     if (!recipe) {
       return res.status(404).json({ message: 'Recipe not found' });
     }
 
     recipe.status = 'approved';
-    recipe.reviewedBy = req.user._id;
-    recipe.adminNotes = req.body.adminNotes || '';
-    recipe.reviewedAt = new Date();
+    recipe.reviewedBy = req.user._id ?? req.user.id ?? null;
+    recipe.adminNotes = req.body?.adminNotes || '';
+
+    console.log('About to save with reviewedBy:', recipe.reviewedBy);
 
     const updatedRecipe = await recipe.save();
+
+    console.log('Save successful');
     return res.status(200).json(updatedRecipe);
+
   } catch (error) {
-    console.error('approveRecipe error:', error.stack);
-    return res.status(500).json({ error: error.message });
+    console.error('=== APPROVE RECIPE ERROR ===');
+    console.error('Message:', error.message);
+    console.error('Stack:', error.stack);
+    console.error('Validation errors:', error.errors);
+    return res.status(500).json({
+      error: error.message,
+      details: error.errors || null
+    });
   }
 };
 

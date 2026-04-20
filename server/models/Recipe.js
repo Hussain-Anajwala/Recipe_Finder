@@ -18,9 +18,9 @@ const recipeSchema = new Schema({
     default: 'pending'
   },
   submittedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  reviewedBy: { type: Schema.Types.ObjectId, ref: 'User' },
-  reviewedAt: { type: Date },
-  adminNotes: { type: String },
+  reviewedBy: { type: Schema.Types.ObjectId, ref: 'User', required: false, default: null },
+  reviewedAt: { type: Date, default: null },
+  adminNotes: { type: String, default: '' },
   nutrition: {
     calories: { type: Number, default: 0 },
     protein: { type: Number, default: 0 },

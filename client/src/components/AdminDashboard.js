@@ -146,6 +146,8 @@ const AdminDashboard = () => {
   const [rejectionNotes, setRejectionNotes] = useState({});
   const [indexStatus, setIndexStatus] = useState('');
   const [rebuildingIndex, setRebuildingIndex] = useState(false);
+  const [retagStatus, setRetagStatus] = useState('');
+  const [retagging, setRetagging] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState(null);
   const [recipeSearch, setRecipeSearch] = useState('');
 
@@ -236,6 +238,19 @@ const AdminDashboard = () => {
       setIndexStatus('⚠️ Rebuild failed. Is the AI service running on port 8000?');
     } finally {
       setRebuildingIndex(false);
+    }
+  };
+
+  const handleRetagAll = async () => {
+    setRetagging(true);
+    setRetagStatus('');
+    try {
+      const { data } = await API.post('/api/ai/retag-all');
+      setRetagStatus(`✅ ${data.tagged_count ?? data.message ?? 'Done'} recipes re-tagged.`);
+    } catch {
+      setRetagStatus('⚠️ Re-tag failed. Is the AI service running on port 8000?');
+    } finally {
+      setRetagging(false);
     }
   };
 
@@ -509,6 +524,31 @@ const AdminDashboard = () => {
                 }
               </button>
               {indexStatus && <p className="text-sm mt-3 text-on-surface-variant">{indexStatus}</p>}
+            </div>
+
+            <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-lg p-6">
+              <div className="flex items-start gap-3 mb-4">
+                <div className="w-9 h-9 bg-secondary/10 rounded flex items-center justify-center flex-shrink-0">
+                  <span className="material-symbols-outlined text-secondary" style={{ fontSize: '20px' }}>sell</span>
+                </div>
+                <div>
+                  <h3 className="font-headline text-xl text-on-surface mb-1">Dietary Auto-Tagger</h3>
+                  <p className="text-on-surface-variant text-sm">
+                    Re-run BART zero-shot classification on all approved recipes to refresh dietary tags.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleRetagAll}
+                disabled={retagging}
+                className="flex items-center gap-2 px-4 py-2.5 bg-secondary text-white rounded text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {retagging
+                  ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Tagging…</>
+                  : <><span className="material-symbols-outlined" style={{ fontSize: '18px' }}>auto_awesome</span>Re-tag Recipes</>
+                }
+              </button>
+              {retagStatus && <p className="text-sm mt-3 text-on-surface-variant">{retagStatus}</p>}
             </div>
 
             <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-lg p-6">
