@@ -17,36 +17,65 @@ const DIETARY_TAGS = [
 ];
 
 // ── Ingredient-keyword fallback for dietary detection ──────────
-// Used when AI hasn't tagged a recipe yet (dietaryTags is empty)
-const MEAT_KEYWORDS = ['chicken','beef','pork','lamb','turkey','duck','fish','salmon','tuna','shrimp','prawn','bacon','sausage','ham','meat','seafood','anchovy','anchovies','pepperoni','lard'];
-const DAIRY_KEYWORDS = ['milk','cheese','butter','cream','yogurt','yoghurt','ghee','paneer','cheddar','mozzarella','parmesan','brie','ricotta','whey'];
-const GLUTEN_KEYWORDS = ['flour','wheat','bread','pasta','noodle','barley','rye','semolina','couscous','breadcrumb','croissant','baguette','tortilla','crouton'];
-const NUT_KEYWORDS = ['almond','cashew','walnut','pecan','pistachio','hazelnut','peanut','nut','macadamia'];
-const HIGH_PROTEIN_KEYWORDS = ['chicken','beef','egg','eggs','lentil','chickpea','tofu','tempeh','salmon','tuna','turkey','protein','quinoa','edamame'];
-const KETO_BLOCKERS = ['sugar','bread','rice','pasta','potato','corn','flour','oat','banana','apple','honey','syrup','cereal','tortilla','noodle'];
+// Threshold-based: requires MULTIPLE signals to avoid false positives
+const MEAT_KEYWORDS   = ['chicken','beef','pork','lamb','turkey','duck','fish','salmon','tuna','shrimp','prawn','bacon','sausage','ham','meat','seafood','anchovy','anchovies','pepperoni','lard','mutton','venison','crab','lobster','clam','oyster','mussels','scallop'];
+const DAIRY_KEYWORDS  = ['milk','cheese','butter','cream','yogurt','yoghurt','ghee','paneer','cheddar','mozzarella','parmesan','brie','ricotta','whey','lactose','dairy'];
+const GLUTEN_KEYWORDS = ['flour','wheat','bread','pasta','noodle','barley','rye','semolina','couscous','breadcrumb','croissant','baguette','tortilla','crouton','pita','bagel','pretzel'];
+const NUT_KEYWORDS    = ['almond','cashew','walnut','pecan','pistachio','hazelnut','peanut','macadamia','pine nut','chestnut'];
+// High-protein requires DENSE protein sources (not just an egg in a dessert)
+const HIGH_PROTEIN_PRIMARY   = ['chicken breast','chicken thigh','ground beef','beef','steak','pork tenderloin','salmon fillet','tuna','turkey breast','tofu','tempeh','edamame','lentil','chickpea','black bean','kidney bean','cottage cheese','greek yogurt','protein powder','whey protein','seitan'];
+const HIGH_PROTEIN_SECONDARY = ['egg','chicken','beef','pork','shrimp','fish','salmon','tuna','turkey','ham','bacon','legume','bean','quinoa'];
+const KETO_BLOCKERS   = ['sugar','bread','rice','pasta','potato','corn','flour','oat','banana','honey','maple syrup','agave','cereal','tortilla','noodle','couscous','sweet potato','cassava','tapioca'];
+
+function countKeywords(text, keywords) {
+  return keywords.reduce((count, kw) => count + (text.includes(kw) ? 1 : 0), 0);
+}
 
 function recipeMatchesDietaryFilter(recipe, activeTag) {
-  const tags = (recipe.dietaryTags || []).map(t => t.toLowerCase());
-  // If AI has tagged it, trust the AI
-  if (tags.includes(activeTag.toLowerCase())) return true;
-  // If AI explicitly tagged something that contradicts, trust that too
-  // Fallback: analyse ingredients
+  const aiTags = (recipe.dietaryTags || []).map(t => t.toLowerCase());
+  // Always trust the AI tagger if it ran
+  if (aiTags.includes(activeTag.toLowerCase())) return true;
+
   const ings = (recipe.ingredients || []).join(' ').toLowerCase();
+  const nutrition = recipe.nutrition || {};
+
   switch (activeTag.toLowerCase()) {
     case 'vegetarian':
+      // Must have zero meat ingredients
       return !MEAT_KEYWORDS.some(k => ings.includes(k));
+
     case 'vegan':
-      return !MEAT_KEYWORDS.some(k => ings.includes(k)) && !DAIRY_KEYWORDS.some(k => ings.includes(k));
+      // Must have zero meat AND zero dairy
+      return !MEAT_KEYWORDS.some(k => ings.includes(k)) &&
+             !DAIRY_KEYWORDS.some(k => ings.includes(k));
+
     case 'gluten-free':
+      // Must have zero gluten ingredients
       return !GLUTEN_KEYWORDS.some(k => ings.includes(k));
+
     case 'dairy-free':
       return !DAIRY_KEYWORDS.some(k => ings.includes(k));
+
     case 'nut-free':
       return !NUT_KEYWORDS.some(k => ings.includes(k));
-    case 'high-protein':
-      return HIGH_PROTEIN_KEYWORDS.some(k => ings.includes(k));
-    case 'keto':
-      return !KETO_BLOCKERS.some(k => ings.includes(k));
+
+    case 'high-protein': {
+      // Tier 1: trust stored nutrition — must be ≥15g protein per serving
+      if (nutrition.protein && nutrition.protein >= 15) return true;
+      // Tier 2: must match ≥1 PRIMARY dense-protein source
+      if (countKeywords(ings, HIGH_PROTEIN_PRIMARY) >= 1) return true;
+      // Tier 3: ≥2 secondary protein sources (e.g. egg + chicken counts, but 1 egg alone does NOT)
+      if (countKeywords(ings, HIGH_PROTEIN_SECONDARY) >= 2) return true;
+      return false;
+    }
+
+    case 'keto': {
+      // Must NOT contain keto-blocking carbs
+      // Allow 1 blocker (some recipes say "a pinch of sugar") but block on ≥2
+      const blockerCount = countKeywords(ings, KETO_BLOCKERS);
+      return blockerCount === 0;
+    }
+
     default:
       return false;
   }

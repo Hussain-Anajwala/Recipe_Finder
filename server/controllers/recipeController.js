@@ -265,8 +265,8 @@ export const searchRecipesByIngredients = async (req, res) => {
         coveragePercentage,
         combinedScore,
         totalIngredients: recipeIngs.length,
-        matchedIngredients, // which ingredients were found (for UI highlighting)
-        searchedIngredients, // echo back for frontend
+        matchedIngredients,
+        searchedIngredients: searchIngredients, // echo back for frontend
       };
     });
 
@@ -280,7 +280,7 @@ export const searchRecipesByIngredients = async (req, res) => {
     const hiddenCount = recipesWithScore.length - filtered.length;
 
     res.json({
-      searchedIngredients,
+      searchedIngredients: searchIngredients,
       totalResults: filtered.length,
       totalBeforeFilter: recipesWithScore.length,
       hiddenByThreshold: hiddenCount,
