@@ -509,7 +509,9 @@ const AdminDashboard = () => {
                 <div>
                   <h3 className="font-headline text-xl text-on-surface mb-1">Rebuild Recommendation Index</h3>
                   <p className="text-on-surface-variant text-sm">
-                    Rebuilds the ChromaDB semantic vector index from all approved recipes. Run after approving a batch.
+                    Rebuild the ChromaDB vector index from all approved recipes.
+                    <strong className="text-on-surface"> Run this FIRST</strong> before recommendations will work.
+                    Re-run after approving new recipes.
                   </p>
                 </div>
               </div>

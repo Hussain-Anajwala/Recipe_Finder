@@ -148,7 +148,8 @@ const RecommendationRow = ({ recipeId, onSelectRecipe }) => {
       try {
         const { data } = await API.get(`/api/ai/similar/${recipeId}`);
         if (mounted) setSimilar(data.similar || []);
-      } catch {
+      } catch (err) {
+        // Silent fail for 503 / AI_SERVICE_DOWN — hide section entirely
         if (mounted) setSimilar([]);
       } finally {
         if (mounted) setLoading(false);
@@ -169,13 +170,15 @@ const RecommendationRow = ({ recipeId, onSelectRecipe }) => {
       <p className="font-technical text-xs text-on-surface-variant mb-4">
         Suggestions based on ingredient and flavor similarity — not your personal history or demographic data.
       </p>
-      <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
+      <div className="space-y-3">
         {loading ? (
           [1, 2, 3].map(i => (
-            <div key={i} className="flex-shrink-0 w-44 bg-surface-container-low border border-outline-variant/20 p-3 animate-pulse">
-              <div className="aspect-video bg-surface-container rounded mb-2" />
-              <div className="h-4 bg-surface-container rounded w-3/4 mb-1" />
-              <div className="h-3 bg-surface-container rounded w-1/2" />
+            <div key={i} className="flex gap-4 p-3 bg-surface-container-low border border-outline/10 animate-pulse">
+              <div className="w-16 h-16 bg-surface-container rounded-sm flex-shrink-0" />
+              <div className="flex-1 py-1">
+                <div className="h-4 bg-surface-container rounded w-3/4 mb-2" />
+                <div className="h-3 bg-surface-container rounded w-1/2" />
+              </div>
             </div>
           ))
         ) : (
@@ -183,18 +186,18 @@ const RecommendationRow = ({ recipeId, onSelectRecipe }) => {
             <div
               key={rec.recipe_id}
               onClick={() => onSelectRecipe(rec.recipe_id)}
-              className="flex-shrink-0 w-44 bg-surface-container-low border border-outline-variant/20 overflow-hidden cursor-pointer group hover:shadow-[0px_8px_24px_rgba(88,65,60,0.1)] transition-all"
+              className="flex gap-4 p-3 bg-surface-container-low hover:bg-surface-container cursor-pointer transition-colors border border-outline/10 group"
               role="button"
               tabIndex={0}
               onKeyDown={e => e.key === 'Enter' && onSelectRecipe(rec.recipe_id)}
             >
-              <div className="aspect-video bg-surface-container flex items-center justify-center">
-                <span className="material-symbols-outlined text-outline" style={{ fontSize: '28px' }}>restaurant</span>
+              <div className="w-16 h-16 bg-surface-container flex items-center justify-center flex-shrink-0 rounded-sm overflow-hidden">
+                <span className="material-symbols-outlined text-outline" style={{ fontSize: '24px' }}>restaurant</span>
               </div>
-              <div className="p-2">
-                <p className="font-headline text-sm text-on-surface leading-snug line-clamp-2 group-hover:text-primary transition-colors">{rec.title}</p>
-                <p className="font-technical text-xs text-primary mt-1">
-                  {Math.round((rec.similarity_score || 0) * 100)}% similar
+              <div>
+                <p className="font-headline text-lg text-on-surface leading-tight group-hover:text-primary transition-colors">{rec.title}</p>
+                <p className="font-technical text-xs text-on-surface-variant uppercase tracking-wider mt-1">
+                  {rec.category && `${rec.category} · `}{Math.round((rec.similarity_score || 0) * 100)}% similar
                 </p>
               </div>
             </div>
@@ -341,20 +344,67 @@ function RecipeList() {
       const scores = data.confidence_scores || {};
       setDetectedIngredients(detected);
       setDetectedScores(scores);
-      // Auto-populate search field
       const combined = detected.join(', ');
       setSearchIngredients(combined);
       if (combined) handleSearch(null, combined, threshold);
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Image detection failed. Is the AI service running?');
+      if (err.response?.status === 503 || err.response?.data?.code === 'AI_SERVICE_DOWN') {
+        toast.error('AI service not running. Start it with: uvicorn main:app --port 8000');
+      } else if (err.response?.status === 500) {
+        toast.error('Image detection failed. Try typing your ingredients instead.');
+      } else {
+        toast.error(err.response?.data?.error || 'Image detection failed.');
+      }
     } finally {
       setDetectingImage(false);
     }
   };
 
   // ── Feature 5: Voice search ────────────────────────────────
-  const startRecording = async () => {
+  // Tries browser SpeechRecognition first (no AI service needed),
+  // falls back to Whisper API only if browser SR is unavailable.
+  const startVoiceSearch = () => {
     if (!user) { toast.error('Please sign in to use voice search.'); return; }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (SpeechRecognition) {
+      // ── Browser-native path (Chrome/Edge, no network request) ──
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      setRecording(true);
+      setVoiceTranscript('');
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        setVoiceTranscript(transcript);
+        setSearchIngredients(transcript);
+        setRecording(false);
+        handleSearch(null, transcript, threshold);
+      };
+
+      recognition.onerror = (event) => {
+        setRecording(false);
+        if (event.error === 'not-allowed') {
+          toast.error('Microphone access denied. Allow mic access in browser settings.');
+        } else {
+          toast.error('Voice recognition error: ' + event.error);
+        }
+      };
+
+      recognition.onend = () => setRecording(false);
+      recognition.start();
+      return; // Done — do NOT call Whisper
+    }
+
+    // ── Whisper fallback (Firefox or when SR unavailable) ──────
+    startWhisperRecording();
+  };
+
+  const startWhisperRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunksRef.current = [];
@@ -364,7 +414,7 @@ function RecipeList() {
       mr.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        await processVoice(audioBlob);
+        await processVoiceWithWhisper(audioBlob);
       };
       mr.start();
       setRecording(true);
@@ -390,7 +440,7 @@ function RecipeList() {
     setRecordingSeconds(0);
   };
 
-  const processVoice = async (audioBlob) => {
+  const processVoiceWithWhisper = async (audioBlob) => {
     setProcessingVoice(true);
     try {
       const formData = new FormData();
@@ -404,9 +454,17 @@ function RecipeList() {
         const combined = extracted.join(', ');
         setSearchIngredients(combined);
         handleSearch(null, combined, threshold);
+      } else {
+        toast.error("Couldn't extract ingredients from audio. Try speaking clearly or type instead.");
       }
-    } catch {
-      toast.error('Voice processing failed. Is the AI service running?');
+    } catch (err) {
+      if (err.response?.status === 503 || err.response?.data?.code === 'AI_SERVICE_DOWN') {
+        toast.error('AI service not running. Start it with: uvicorn main:app --port 8000');
+      } else if (err.response?.status === 500) {
+        toast.error('Voice transcription failed. Try typing your ingredients instead.');
+      } else {
+        toast.error('Voice processing failed.');
+      }
     } finally {
       setProcessingVoice(false);
     }
@@ -494,7 +552,7 @@ function RecipeList() {
 
               {/* Feature 5: Voice search */}
               <button
-                onClick={recording ? stopRecording : startRecording}
+                onClick={recording ? stopRecording : startVoiceSearch}
                 disabled={processingVoice}
                 title={recording ? 'Stop recording' : 'Search by voice'}
                 className={`flex items-center gap-2 px-4 py-2 border font-label text-xs uppercase tracking-widest transition-colors ${
