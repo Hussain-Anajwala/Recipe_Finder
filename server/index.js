@@ -6,11 +6,13 @@ import cors from "cors";
 import authRoutes from "./routes/auth.js";
 import recipeRoutes from "./routes/recipes.js";
 import adminRoutes from "./routes/admin.js";
+import aiRoutes from "./routes/ai.js";
 
 const app = express();
 
 dotenv.config({ path: "./.env" });
 
+const AI_SERVICE_URL = process.env.AI_SERVICE_URL || "http://localhost:8000";
 
 // Middleware
 app.use(cors());
@@ -20,9 +22,10 @@ app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/recipes", recipeRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/ai", aiRoutes);
 
 app.get("/", (req, res) => {
-  res.send("API is running...");
+  res.send("Savour API is running...");
 });
 
 // Connect to MongoDB

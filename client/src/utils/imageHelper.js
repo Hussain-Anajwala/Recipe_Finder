@@ -1,15 +1,31 @@
-const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1495195134817-a169b329ff0b?q=80&w=600&auto=format&fit=crop";
+const PLACEHOLDER =
+  "data:image/svg+xml," +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">' +
+    '<rect width="400" height="300" fill="#f0ebe6"/>' +
+    '<text x="50%" y="50%" font-family="serif" font-size="48" fill="#c9b8af" text-anchor="middle" dominant-baseline="central">&#x1F374;</text>' +
+    '</svg>'
+  );
 
-export const getImageUrl = (imageUrl) => {
-  if (!imageUrl) return FALLBACK_IMAGE;
-  if (imageUrl.startsWith('http')) return imageUrl;
-  // If it's a relative backend path
-  return `http://localhost:5000${imageUrl}`;
-};
-
-export const handleImageError = (e) => {
-  // Prevent infinite loop if fallback image also fails
-  if (e.target.src !== FALLBACK_IMAGE) {
-    e.target.src = FALLBACK_IMAGE;
+/**
+ * Resolves a recipe image URL to an absolute URL or fallback.
+ * Handles: absolute URLs, relative /uploads/... paths, empty values.
+ */
+export function getImageUrl(url) {
+  if (!url) return PLACEHOLDER;
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+    return url;
   }
-};
+  // Relative path — prepend the Express server origin in development
+  const base = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+  return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+}
+
+/**
+ * Attach to <img onError> to swap in the placeholder if the image fails to load.
+ */
+export function handleImageError(e) {
+  if (e.target.src !== PLACEHOLDER) {
+    e.target.src = PLACEHOLDER;
+  }
+}

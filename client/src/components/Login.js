@@ -1,197 +1,116 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import API from '../config/api';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import { toast } from '../utils/toast';
 
-function Login() {
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    role: 'user', // Always user on the public login page
-  });
-  const navigate = useNavigate();
+const Login = () => {
+  const [form, setForm] = useState({ email: '', password: '' });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const { login } = useAuth();
+  const navigate = useNavigate();
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
+  const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value });
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async e => {
     e.preventDefault();
+    setError('');
+    setLoading(true);
     try {
-      const response = await API.post('/api/auth/login', {
-        email: formData.email,
-        password: formData.password
-      });
-
-      // Verify the role matches what user selected
-      if (response.data.user.role !== formData.role) {
-        toast.error(`Invalid credentials. This account is registered as ${response.data.user.role}.`);
-        return;
-      }
-
-      // Use the login function from AuthContext
-      login(response.data.token, response.data.user);
-
-      console.log('Login successful:', response.data);
-      toast.success(`Welcome ${response.data.user.firstName}!`);
-
-      navigate('/my-recipes');
-
-    } catch (error) {
-      console.error('Login error:', error.response ? error.response.data : error.message);
-      toast.error(`Login failed: ${error.response ? error.response.data.message : 'Invalid credentials'}`);
+      const { data } = await axios.post('/api/auth/login', form);
+      login(data.token, data.user);
+      navigate(data.user.role === 'admin' ? '/admin' : '/recipes');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Login failed. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const [showPassword, setShowPassword] = useState(false);
-
-  // Chef's Note tooltip dismiss on click-outside
-  const [showChefNote, setShowChefNote] = useState(true);
-  const chefNoteRef = useRef(null);
-
-  useEffect(() => {
-    if (!showChefNote) return;
-    const handleClickOutside = (e) => {
-      if (chefNoteRef.current && !chefNoteRef.current.contains(e.target)) {
-        setShowChefNote(false);
-      }
-    };
-    // Listen on capture phase so clicks anywhere dismiss it
-    document.addEventListener('mousedown', handleClickOutside, true);
-    return () => document.removeEventListener('mousedown', handleClickOutside, true);
-  }, [showChefNote]);
-
   return (
-    <div className="bg-background text-on-surface font-body min-h-screen flex items-stretch">
-      {/* Left Column: Branding & Imagery */}
-      <section className="hidden lg:flex w-1/2 bg-primary relative overflow-hidden flex-col justify-between p-16 text-on-primary">
-        <div className="absolute inset-0 grain-overlay pointer-events-none"></div>
-        <div className="absolute inset-0 opacity-40 mix-blend-multiply">
-          <img alt="artisan kitchen background" className="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDF0ARxtPNEXliWi9_quX2avXxcvRb6NmYAW8EPRcAgM2dl1t_Ym2BaIAmJJJoptKUmXSRp3Yay6pqxQAM-ijVCpHX-9TUkmjjbSLHiQpjSZkEXOc5otg7k8twQOdrnJjyUeXN2KJXcv1-nOwCwv4p4KU2-VCIFqbl0-GFo_76K88MLfwAYQjVPra00csM-9UvagriHH9npVBuhxpYbLHuYqHXDC4r_SMm0sZYdxd8qv8Si2q2UyJSPdsRTXMy30CD9jUS09kb25_s5"/>
+    <div className="min-h-screen bg-background flex items-center justify-center px-4">
+      <div className="w-full max-w-md">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="font-headline text-4xl text-on-surface mb-2">Welcome back</h1>
+          <p className="text-on-surface-variant text-sm">Sign in to your Savour account</p>
         </div>
-        
-        <div className="relative z-10 pt-10">
-          <h1 className="font-display text-6xl font-semibold tracking-tighter cursor-pointer" onClick={() => navigate('/')}>Savour</h1>
-          <div className="h-1 w-12 bg-on-primary mt-4"></div>
-        </div>
-        
-        <div className="relative z-10 max-w-md">
-          <h2 className="font-display text-5xl leading-tight italic">Every great meal begins with a great recipe.</h2>
-          <p className="mt-8 font-body text-lg opacity-90 leading-relaxed font-light">
-              Join our curated community of culinary enthusiasts and explore the sensory world of professional gastronomy.
-          </p>
-        </div>
-        
-        <div className="relative z-10 flex items-center gap-4 text-xs font-label tracking-[0.2em] uppercase">
-          <span>The Sensory Sommelier</span>
-          <span className="w-8 h-[1px] bg-on-primary/40"></span>
-          <span>Est. 2024</span>
-        </div>
-      </section>
 
-      {/* Right Column: Authentication Flow */}
-      <main className="w-full lg:w-1/2 bg-surface flex items-center justify-center p-8 md:p-24 pt-20 lg:pt-8 relative">
-        <div className="w-full max-w-[420px]">
-          <div className="lg:hidden mb-12">
-            <h1 className="font-display text-4xl text-primary font-semibold tracking-tighter cursor-pointer" onClick={() => navigate('/')}>Savour</h1>
-          </div>
-          
-          <header className="mb-12">
-            <h2 className="font-display text-4xl text-on-surface mb-3 font-bold tracking-tight">Welcome back.</h2>
-            <p className="text-on-surface-variant font-body text-base">Sign in to your Savour account.</p>
-          </header>
+        {/* Card */}
+        <div className="bg-surface-container-low border border-outline-variant rounded-lg p-8 editorial-shadow">
+          {error && (
+            <div className="mb-4 p-3 bg-error-container border border-error/20 rounded text-on-error-container text-sm flex items-center gap-2">
+              <span className="material-symbols-outlined text-error" style={{ fontSize: '18px' }}>error</span>
+              {error}
+            </div>
+          )}
 
-          <form onSubmit={handleSubmit} className="space-y-8">
-            <div className="group">
-              <label htmlFor="email" className="block text-xs font-label font-bold tracking-[0.15em] text-on-surface-variant uppercase mb-3 group-focus-within:text-primary transition-colors">Email Address</label>
-              <input 
-                type="email" 
-                id="email" 
-                name="email" 
-                value={formData.email}
-                onChange={handleChange}
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-on-surface mb-1.5">
+                Email address
+              </label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
                 required
-                placeholder="chef@savour.com" 
-                className="w-full bg-transparent border-0 border-b border-outline/30 focus:border-primary focus:ring-0 px-0 py-3 font-body text-base text-on-surface placeholder:text-outline/40 transition-all" 
+                value={form.email}
+                onChange={handleChange}
+                className="w-full px-3 py-2.5 bg-surface border border-outline-variant rounded text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors text-sm"
+                placeholder="you@example.com"
               />
             </div>
-            
-            <div className="group">
-              <div className="flex justify-between items-end mb-3">
-                <label htmlFor="password" className="block text-xs font-label font-bold tracking-[0.15em] text-on-surface-variant uppercase group-focus-within:text-primary transition-colors">Password</label>
-                <button type="button" className="text-xs font-label font-bold tracking-[0.1em] text-primary uppercase hover:opacity-70 transition-opacity">Forgot?</button>
-              </div>
-              <div className="relative">
-                <input 
-                  type={showPassword ? "text" : "password"} 
-                  id="password" 
-                  name="password" 
-                  value={formData.password}
-                  onChange={handleChange}
-                  required
-                  placeholder="••••••••" 
-                  className="w-full bg-transparent border-0 border-b border-outline/30 focus:border-primary focus:ring-0 px-0 py-3 font-body text-base text-on-surface placeholder:text-outline/40 transition-all" 
-                />
-                <button 
-                  type="button" 
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-0 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors"
-                >
-                  <span className="material-symbols-outlined text-xl">{showPassword ? 'visibility_off' : 'visibility'}</span>
-                </button>
-              </div>
+
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-on-surface mb-1.5">
+                Password
+              </label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={form.password}
+                onChange={handleChange}
+                className="w-full px-3 py-2.5 bg-surface border border-outline-variant rounded text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors text-sm"
+                placeholder="••••••••"
+              />
             </div>
 
-            <div className="pt-4">
-              <button type="submit" className="w-full bg-primary text-on-primary font-label font-semibold tracking-widest uppercase py-5 px-8 rounded-sm hover:bg-primary-container transition-all active:scale-[0.98] text-sm">
-                  Sign In
-              </button>
-            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-2.5 bg-primary text-on-primary rounded font-medium text-sm hover:bg-primary-container transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-on-primary border-t-transparent rounded-full animate-spin" />
+                  Signing in…
+                </>
+              ) : 'Sign in'}
+            </button>
           </form>
 
-          <footer className="mt-16 pt-8 border-t border-outline-variant/20">
-            <div className="flex flex-col gap-4 text-center">
-              <p className="text-on-surface-variant text-base font-body">
-                  New to Savour? 
-                  <Link to="/signup" className="text-primary font-semibold hover:underline decoration-primary/30 underline-offset-4 ml-1">Create your account</Link>
-              </p>
-              <div className="flex justify-center items-center gap-6 mt-4">
-                <button type="button" className="text-xs font-label tracking-widest text-outline uppercase hover:text-on-surface transition-colors">Privacy</button>
-                <span className="w-1 h-1 rounded-full bg-outline/30"></span>
-                <button type="button" className="text-xs font-label tracking-widest text-outline uppercase hover:text-on-surface transition-colors">Terms</button>
-                <span className="w-1 h-1 rounded-full bg-outline/30"></span>
-                <button type="button" className="text-xs font-label tracking-widest text-outline uppercase hover:text-on-surface transition-colors">Support</button>
-              </div>
-            </div>
-          </footer>
+          <p className="mt-6 text-center text-sm text-on-surface-variant">
+            Don't have an account?{' '}
+            <Link to="/signup" className="text-primary hover:underline font-medium">
+              Create one
+            </Link>
+          </p>
         </div>
-      </main>
 
-      {/* Chef's Note — dismisses on click-outside */}
-      {showChefNote && (
-        <div
-          ref={chefNoteRef}
-          className="fixed top-8 right-8 z-50 cursor-pointer hidden lg:block"
-          onClick={() => setShowChefNote(false)}
-          title="Click to dismiss"
-        >
-          <div className="p-4 bg-surface-container-lowest/90 backdrop-blur-md border border-outline-variant/10 rounded-sm shadow-xl relative">
-            <button
-              onClick={() => setShowChefNote(false)}
-              className="absolute top-1.5 right-1.5 text-outline/50 hover:text-outline transition-colors"
-              aria-label="Dismiss"
-            >
-              <span className="material-symbols-outlined text-sm">close</span>
-            </button>
-            <span className="font-technical text-xs text-primary block leading-none mb-1.5 pr-4">CHEF'S NOTE</span>
-            <span className="font-technical text-[11px] text-on-surface-variant block leading-tight max-w-[140px]">Recommended: Enable biometric sign-in for faster access.</span>
-          </div>
-        </div>
-      )}
+        <p className="mt-4 text-center text-xs text-on-surface-variant">
+          Admin?{' '}
+          <Link to="/admin-login" className="text-on-surface-variant hover:text-on-surface underline">
+            Admin sign in
+          </Link>
+        </p>
+      </div>
     </div>
   );
-}
+};
 
 export default Login;

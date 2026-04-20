@@ -1,177 +1,142 @@
 import React, { useState, useEffect } from 'react';
-import API from '../config/api';
-import { useNavigate } from 'react-router-dom';
-import LoadingSpinner from './LoadingSpinner';
-import { toast } from '../utils/toast';
-import { getImageUrl, handleImageError } from '../utils/imageHelper';
+import { Link } from 'react-router-dom';
+import axios from 'axios';
 
-function MyRecipes() {
+const STATUS_STYLES = {
+  pending: 'bg-tertiary-container/50 text-on-tertiary-container',
+  approved: 'bg-secondary-container/60 text-on-secondary-container',
+  rejected: 'bg-error-container text-on-error-container',
+};
+
+const MyRecipes = () => {
   const [recipes, setRecipes] = useState([]);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
+  const [deleting, setDeleting] = useState(null);
 
   useEffect(() => {
-    fetchMyRecipes();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    axios.get('/api/recipes/my-submissions')
+      .then(({ data }) => setRecipes(data))
+      .catch(() => setRecipes([]))
+      .finally(() => setLoading(false));
   }, []);
 
-  const getAuthConfig = () => {
-    const token = localStorage.getItem('token');
-    return {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    };
-  };
-
-  const fetchMyRecipes = async () => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      navigate('/login');
-      return;
-    }
+  const handleDelete = async (id, title) => {
+    if (!window.confirm(`Delete "${title}"? This cannot be undone.`)) return;
+    setDeleting(id);
     try {
-      const response = await API.get('/api/recipes/my-submissions', getAuthConfig());
-      setRecipes(response.data);
-      setLoading(false);
-    } catch (error) {
-      console.error('Error fetching recipes:', error);
-      toast.error('Failed to load your recipes');
-      setLoading(false);
+      await axios.delete(`/api/recipes/${id}`);
+      setRecipes(prev => prev.filter(r => r._id !== id));
+    } catch {
+      alert('Failed to delete recipe.');
+    } finally {
+      setDeleting(null);
     }
   };
-
-  const handleDeleteRecipe = async (recipeId, recipeTitle) => {
-    if (!window.confirm(`Are you sure you want to delete "${recipeTitle}"?`)) {
-      return;
-    }
-    try {
-      await API.delete(`/api/recipes/${recipeId}`, getAuthConfig());
-      toast.success('Recipe deleted successfully!');
-      fetchMyRecipes();
-    } catch (error) {
-      console.error('Error deleting recipe:', error);
-      toast.error('Failed to delete recipe');
-    }
-  };
-
-  const getStatusBadge = (status) => {
-    const base = "px-3 py-1 text-[10px] font-label font-bold tracking-widest uppercase border";
-    switch (status) {
-      case 'approved':
-        return <span className={`${base} bg-primary/10 text-primary border-primary/20`}>{status}</span>;
-      case 'rejected':
-        return <span className={`${base} bg-error/10 text-error border-error/20`}>{status}</span>;
-      case 'pending':
-        return <span className={`${base} bg-amber-500/10 text-amber-700 border-amber-500/20`}>{status}</span>;
-      default:
-        return <span className={`${base} bg-surface-container-high text-on-surface-variant border-outline`}>{status}</span>;
-    }
-  };
-
-  if (loading) {
-    return <LoadingSpinner />;
-  }
 
   return (
-    <main className="min-h-screen bg-surface pt-24 pb-12 px-6 lg:px-12 relative">
-      <div className="absolute inset-0 grain-overlay z-[0] pointer-events-none"></div>
+    <div className="min-h-screen bg-background">
+      <div className="bg-surface-container-low border-b border-outline-variant">
+        <div className="max-w-4xl mx-auto px-4 py-8 flex items-center justify-between">
+          <div>
+            <h1 className="font-headline text-4xl text-on-surface mb-1">My Recipes</h1>
+            <p className="text-on-surface-variant text-sm">Recipes you've submitted to the Savour community.</p>
+          </div>
+          <Link to="/add"
+            className="flex items-center gap-2 px-4 py-2.5 bg-primary text-on-primary rounded text-sm font-medium hover:bg-primary-container transition-colors">
+            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>add</span>
+            New Recipe
+          </Link>
+        </div>
+      </div>
 
-      <div className="max-w-5xl mx-auto relative z-10">
-        
-        <header className="mb-12 border-b-2 border-primary/20 pb-8 text-center md:text-left">
-          <span className="font-label text-primary tracking-[0.2em] text-xs font-bold block mb-2 uppercase">Your Kitchen</span>
-          <h1 className="font-headline tracking-tighter text-5xl md:text-6xl text-on-surface mb-4">My Submissions</h1>
-          <p className="font-body text-base text-on-surface-variant max-w-2xl">
-            Track the curation status of your personal heirloom recipes. Pending volumes are awaiting review by our editorial board.
-          </p>
-        </header>
-
-        {recipes.length === 0 ? (
-          <div className="py-24 text-center border border-dashed border-outline-variant bg-surface-container-lowest editorial-shadow">
-            <h3 className="font-headline text-3xl text-on-surface mb-4">Empty Archives</h3>
-            <p className="font-body text-on-surface-variant mb-8 max-w-sm mx-auto">You have not submitted any recipes for curation yet. Begin compiling your legacy.</p>
-            <button 
-              onClick={() => navigate('/add')}
-              className="bg-primary text-on-primary font-label uppercase tracking-widest text-xs font-bold py-4 px-8 rounded-sm hover:-translate-y-1 transition-transform editorial-shadow"
-            >
-              Author a Recipe
-            </button>
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        {loading ? (
+          <div className="space-y-4">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="animate-pulse bg-surface-container-low border border-outline-variant rounded-lg p-5 flex gap-4">
+                <div className="w-20 h-20 bg-surface-container-high rounded" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-5 bg-surface-container-high rounded w-1/2" />
+                  <div className="h-4 bg-surface-container-high rounded w-1/3" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : recipes.length === 0 ? (
+          <div className="text-center py-16">
+            <span className="material-symbols-outlined text-outline" style={{ fontSize: '48px' }}>inbox</span>
+            <h2 className="font-headline text-2xl text-on-surface mt-4 mb-2">No recipes yet</h2>
+            <p className="text-on-surface-variant text-sm mb-6">Share your first recipe with the community.</p>
+            <Link to="/add" className="px-6 py-2.5 bg-primary text-on-primary rounded text-sm font-medium hover:bg-primary-container transition-colors">
+              Submit a Recipe
+            </Link>
           </div>
         ) : (
-          <div className="flex flex-col gap-6">
-            {recipes.map((recipe) => (
-              <article 
-                key={recipe._id} 
-                className="bg-surface-container-lowest editorial-shadow flex flex-col md:flex-row border-t border-b sm:border border-outline/30 relative"
-              >
-                {/* Image Section */}
-                <div className="w-full md:w-48 lg:w-64 aspect-[4/3] md:aspect-auto md:h-full bg-surface-container-low flex-shrink-0">
-                  <img 
-                    src={getImageUrl(recipe.imageUrl || recipe.image)} 
-                    alt={recipe.title} 
-                    className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-500" 
-                    onError={handleImageError}
-                  />
-                </div>
-                
-                {/* Content Section */}
-                <div className="p-6 md:p-8 flex-1 flex flex-col pt-8 md:pt-8 min-h-[220px]">
-                  
-                  {/* Status & Date */}
-                  <div className="absolute top-6 right-6 md:static md:mb-4 flex flex-col md:flex-row items-end md:items-center justify-between w-full md:w-auto">
-                     {getStatusBadge(recipe.status)}
-                     <div className="font-technical text-[10px] sm:text-xs text-on-surface-variant uppercase mt-2 md:mt-0 tracking-wider">
-                       {new Date(recipe.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
-                     </div>
-                  </div>
-
-                  {/* Title & Desc */}
-                  <h3 className="font-headline text-3xl text-on-surface mb-2 mt-4 md:mt-0 pr-16 md:pr-0">{recipe.title}</h3>
-                  <p className="font-body text-on-surface-variant text-sm line-clamp-2 md:line-clamp-3 mb-6 max-w-3xl">
-                    {recipe.description}
-                  </p>
-
-                  {/* Meta Tags */}
-                  <div className="flex flex-wrap gap-4 font-technical text-xs text-on-surface-variant mb-6 mt-auto">
-                    <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[1rem]">folder</span> {recipe.category}</span>
-                    <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[1rem]">schedule</span> {recipe.prepTime + recipe.cookTime}m</span>
-                    <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[1rem]">restaurant</span> {recipe.servings} serves</span>
-                    <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[1rem]">bar_chart</span> {recipe.difficulty}</span>
-                  </div>
-
-                  {/* Admin Notes */}
-                  {recipe.adminNotes && (
-                    <div className="bg-surface-container pt-3 pb-3 px-4 border-l-2 border-primary mb-6">
-                      <strong className="font-label text-xs uppercase tracking-widest text-primary block mb-1">Editorial Note:</strong> 
-                      <p className="font-body text-sm text-on-surface italic">{recipe.adminNotes}</p>
+          <div className="space-y-4">
+            {recipes.map(recipe => (
+              <article key={recipe._id} className="bg-surface-container-low border border-outline-variant rounded-lg p-5 flex gap-4 items-start">
+                {/* Thumbnail */}
+                <div className="w-20 h-20 bg-surface-container-high rounded overflow-hidden flex-shrink-0">
+                  {recipe.image ? (
+                    <img src={recipe.image} alt={recipe.title} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <span className="material-symbols-outlined text-outline" style={{ fontSize: '24px' }}>restaurant</span>
                     </div>
                   )}
-                  
-                  {/* Action Buttons */}
-                  <div className="flex gap-4 pt-4 border-t border-outline/30 mt-auto">
-                    <button
-                      onClick={() => navigate(`/edit-recipe/${recipe._id}`)}
-                      className="font-label text-xs uppercase tracking-widest text-on-surface hover:text-primary transition-colors flex items-center gap-1"
-                    >
-                      <span className="material-symbols-outlined text-[1rem]">edit</span> Edit Draft
-                    </button>
-                    <button
-                      onClick={() => handleDeleteRecipe(recipe._id, recipe.title)}
-                      className="font-label text-xs uppercase tracking-widest text-error hover:text-red-700 transition-colors flex items-center gap-1"
-                    >
-                      <span className="material-symbols-outlined text-[1rem]">delete</span> Permanently Delete
-                    </button>
+                </div>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <h3 className="font-headline text-xl text-on-surface">{recipe.title}</h3>
+                    <span className={`font-technical text-xs px-2 py-0.5 rounded-full ${STATUS_STYLES[recipe.status] || ''}`}>
+                      {recipe.status}
+                    </span>
                   </div>
 
+                  <p className="text-on-surface-variant text-sm line-clamp-2 mb-2">{recipe.description}</p>
+
+                  {/* Dietary tags */}
+                  {recipe.dietaryTags && recipe.dietaryTags.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {recipe.dietaryTags.map(tag => (
+                        <span key={tag} className="font-technical text-xs px-2 py-0.5 bg-secondary-container/40 text-on-secondary-container rounded-full">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {recipe.status === 'rejected' && recipe.adminNotes && (
+                    <p className="font-technical text-xs text-error mt-1">
+                      Admin note: {recipe.adminNotes}
+                    </p>
+                  )}
+
+                  <div className="flex gap-2 mt-3">
+                    <Link to={`/edit-recipe/${recipe._id}`}
+                      className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-outline-variant text-on-surface-variant hover:text-on-surface hover:border-on-surface-variant rounded transition-colors">
+                      <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>edit</span>
+                      Edit
+                    </Link>
+                    <button
+                      onClick={() => handleDelete(recipe._id, recipe.title)}
+                      disabled={deleting === recipe._id}
+                      className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-outline-variant text-on-surface-variant hover:text-error hover:border-error rounded transition-colors disabled:opacity-50"
+                      aria-label={`Delete ${recipe.title}`}>
+                      <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>delete</span>
+                      {deleting === recipe._id ? 'Deleting…' : 'Delete'}
+                    </button>
+                  </div>
                 </div>
               </article>
             ))}
           </div>
         )}
       </div>
-    </main>
+    </div>
   );
-}
+};
 
 export default MyRecipes;

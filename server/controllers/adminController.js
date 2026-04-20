@@ -119,6 +119,30 @@ export const getAllUsers = async (req, res) => {
   }
 };
 
+// @desc    Update a user's role (admin <-> user)
+// @route   PUT /api/admin/users/:id/role
+export const updateUserRole = async (req, res) => {
+  try {
+    const { role } = req.body;
+    if (!['user', 'admin'].includes(role)) {
+      return res.status(400).json({ message: 'Role must be "user" or "admin"' });
+    }
+    // Prevent removing own admin
+    if (req.params.id === req.user.id && role !== 'admin') {
+      return res.status(403).json({ message: 'You cannot remove your own admin role.' });
+    }
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { role },
+      { new: true }
+    ).select('-password');
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 // @desc    Delete a user and all their recipes
 // @route   DELETE /api/admin/users/:id
 export const deleteUser = async (req, res) => {

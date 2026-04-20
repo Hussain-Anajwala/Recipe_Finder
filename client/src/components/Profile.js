@@ -1,210 +1,165 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 
-import API from '../config/api';
-import { toast } from '../utils/toast';
-import LoadingSpinner from './LoadingSpinner';
-
-function Profile() {
-  const [loading, setLoading] = useState(true);
-  const [profileData, setProfileData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    username: ''
+const Profile = () => {
+  const { user, login, token } = useAuth();
+  const [tab, setTab] = useState('profile');
+  const [form, setForm] = useState({
+    firstName: user?.firstName || '',
+    lastName: user?.lastName || '',
+    email: user?.email || '',
   });
-  const [passwordData, setPasswordData] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: ''
-  });
+  const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
-  useEffect(() => {
-    fetchProfile();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value });
+  const handlePwChange = e => setPwForm({ ...pwForm, [e.target.name]: e.target.value });
 
-  const getAuthConfig = () => {
-    const token = localStorage.getItem('token');
-    return { headers: { 'Authorization': `Bearer ${token}` } };
+  const handleProfileSave = async e => {
+    e.preventDefault();
+    setError(''); setSuccess('');
+    setSaving(true);
+    try {
+      const { data } = await axios.put('/api/auth/profile', form);
+      login(token, data.user);
+      setSuccess('Profile updated successfully!');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Update failed.');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const fetchProfile = async () => {
+  const handlePasswordChange = async e => {
+    e.preventDefault();
+    setError(''); setSuccess('');
+    if (pwForm.newPassword !== pwForm.confirmPassword) {
+      setError('New passwords do not match.');
+      return;
+    }
+    setSaving(true);
     try {
-      const response = await API.get('/api/auth/profile', getAuthConfig());
-      setProfileData({
-        firstName: response.data.firstName,
-        lastName: response.data.lastName,
-        email: response.data.email,
-        username: response.data.username
+      await axios.put('/api/auth/change-password', {
+        currentPassword: pwForm.currentPassword,
+        newPassword: pwForm.newPassword,
       });
-      setLoading(false);
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-      toast.error('Failed to load profile context');
-      setLoading(false);
+      setSuccess('Password changed successfully!');
+      setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (err) {
+      setError(err.response?.data?.message || 'Password change failed.');
+    } finally {
+      setSaving(false);
     }
   };
-
-  const handleProfileChange = (e) => {
-    setProfileData({ ...profileData, [e.target.name]: e.target.value });
-  };
-
-  const handlePasswordChange = (e) => {
-    setPasswordData({ ...passwordData, [e.target.name]: e.target.value });
-  };
-
-  const handleProfileSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      await API.put('/api/auth/profile', profileData, getAuthConfig());
-      toast.success('Author profile updated successfully!');
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      toast.error(error.response?.data?.message || 'Failed to update profile');
-    }
-  };
-
-  const handlePasswordSubmit = async (e) => {
-    e.preventDefault();
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      toast.warning('New passwords missmatch!');
-      return;
-    }
-    if (passwordData.newPassword.length < 6) {
-      toast.warning('New password must be at least 6 characters long');
-      return;
-    }
-    try {
-      await API.put(
-        '/api/auth/change-password',
-        { currentPassword: passwordData.currentPassword, newPassword: passwordData.newPassword },
-        getAuthConfig()
-      );
-      toast.success('Password amended successfully!');
-      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-    } catch (error) {
-      console.error('Error changing password:', error);
-      toast.error(error.response?.data?.message || 'Failed to change password');
-    }
-  };
-
-  if (loading) {
-    return <LoadingSpinner />;
-  }
 
   return (
-    <main className="pt-32 pb-24 px-6 relative overflow-hidden min-h-screen bg-surface">
-      <div className="absolute inset-0 grain-overlay pointer-events-none opacity-50 z-[0]"></div>
-      
-      <div className="max-w-[1000px] mx-auto relative z-10">
-        <div className="mb-16 text-center lg:text-left border-b border-outline-variant/20 pb-8">
-          <span className="font-label text-xs tracking-[0.2em] text-primary mb-2 block font-medium uppercase">Author Identity</span>
-          <h1 className="text-5xl md:text-6xl font-headline text-on-surface leading-tight tracking-tight">Your Profile</h1>
-          <p className="mt-4 text-on-surface-variant font-body max-w-xl leading-relaxed mx-auto lg:mx-0">Manage your public persona, update your contact details, and secure your account credentials within the Savour community.</p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
-          
-          {/* Profile Information */}
-          <div className="lg:col-span-7 bg-surface-container-lowest shadow-[0px_20px_40px_rgba(88,65,60,0.08)] p-8 md:p-12 border border-outline-variant/10 relative">
-            <div className="flex items-center gap-4 mb-8">
-              <span className="material-symbols-outlined text-3xl text-primary font-light">tune</span>
-              <h2 className="font-headline text-3xl text-on-surface italic">Personal Details</h2>
+    <div className="min-h-screen bg-background">
+      <div className="bg-surface-container-low border-b border-outline-variant">
+        <div className="max-w-xl mx-auto px-4 py-8">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center">
+              <span className="font-headline text-2xl text-primary">
+                {user?.firstName?.[0]}{user?.lastName?.[0]}
+              </span>
             </div>
-            
-            <form onSubmit={handleProfileSubmit} className="space-y-8 relative z-10">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div>
-                  <label className="block font-label text-[10px] tracking-[0.15em] font-semibold text-outline uppercase mb-3 text-on-surface-variant">First Name</label>
-                  <input
-                    type="text" name="firstName" value={profileData.firstName} onChange={handleProfileChange} required
-                    className="w-full bg-transparent border-0 border-b border-outline focus:ring-0 focus:border-primary transition-colors py-3 font-body placeholder:text-surface-variant"
-                  />
-                </div>
-                <div>
-                  <label className="block font-label text-[10px] tracking-[0.15em] font-semibold text-outline uppercase mb-3 text-on-surface-variant">Last Name</label>
-                  <input
-                    type="text" name="lastName" value={profileData.lastName} onChange={handleProfileChange} required
-                    className="w-full bg-transparent border-0 border-b border-outline focus:ring-0 focus:border-primary transition-colors py-3 font-body placeholder:text-surface-variant"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-label text-[10px] tracking-[0.15em] font-semibold text-outline uppercase mb-3 text-on-surface-variant">Pen Name (Username)</label>
-                <div className="flex items-center border-b border-outline/50 bg-surface-container-low/50 py-3 px-4">
-                  <span className="material-symbols-outlined text-outline-variant mr-3 select-none text-sm">lock</span>
-                  <input
-                    type="text" value={profileData.username} disabled
-                    className="w-full bg-transparent border-0 focus:ring-0 p-0 font-body text-on-surface-variant cursor-not-allowed italic"
-                  />
-                </div>
-                <p className="text-[10px] text-outline italic mt-2">Your pen name is permanently assigned acting as your signature.</p>
-              </div>
-
-              <div>
-                <label className="block font-label text-[10px] tracking-[0.15em] font-semibold text-outline uppercase mb-3 text-on-surface-variant">Email Contact</label>
-                <input
-                  type="email" name="email" value={profileData.email} onChange={handleProfileChange} required
-                  className="w-full bg-transparent border-0 border-b border-outline focus:ring-0 focus:border-primary transition-colors py-3 font-body placeholder:text-surface-variant"
-                />
-              </div>
-
-              <div className="pt-4">
-                <button type="submit" className="w-full bg-primary text-on-primary flex justify-center items-center gap-2 py-5 px-8 font-label text-sm tracking-[0.15em] font-bold uppercase transition-all hover:opacity-90 active:scale-[0.98] shadow-lg shadow-primary/20">
-                  Save Adjustments
-                </button>
-              </div>
-            </form>
-          </div>
-
-          {/* Change Password */}
-          <div className="lg:col-span-5 bg-surface-container-low p-8 md:p-10 border border-outline-variant/20 relative rounded-sm">
-            <div className="flex items-center gap-3 mb-8">
-              <span className="material-symbols-outlined text-xl text-on-surface-variant">shield_lock</span>
-              <h2 className="font-headline text-2xl text-on-surface">Security Framework</h2>
+            <div>
+              <h1 className="font-headline text-3xl text-on-surface">
+                {user?.firstName} {user?.lastName}
+              </h1>
+              <p className="font-technical text-xs text-on-surface-variant">@{user?.username}</p>
             </div>
-            
-            <form onSubmit={handlePasswordSubmit} className="space-y-6">
-              <div>
-                <label className="block font-label text-[10px] tracking-[0.15em] font-semibold text-outline uppercase mb-2 text-on-surface-variant">Current Authentication</label>
-                <input
-                  type="password" name="currentPassword" value={passwordData.currentPassword} onChange={handlePasswordChange} required
-                  className="w-full bg-transparent border-0 border-b border-outline focus:ring-0 focus:border-primary transition-colors py-3 font-technical text-sm placeholder:text-surface-variant tracking-wider"
-                  placeholder="••••••••"
-                />
-              </div>
-
-              <div>
-                <label className="block font-label text-[10px] tracking-[0.15em] font-semibold text-outline uppercase mb-2 text-on-surface-variant">New Security Passphrase</label>
-                <input
-                  type="password" name="newPassword" value={passwordData.newPassword} onChange={handlePasswordChange} required minLength="6"
-                  className="w-full bg-transparent border-0 border-b border-outline focus:ring-0 focus:border-primary transition-colors py-3 font-technical text-sm placeholder:text-surface-variant tracking-wider"
-                  placeholder="••••••••"
-                />
-              </div>
-
-              <div>
-                <label className="block font-label text-[10px] tracking-[0.15em] font-semibold text-outline uppercase mb-2 text-on-surface-variant">Confirm Passphrase</label>
-                <input
-                  type="password" name="confirmPassword" value={passwordData.confirmPassword} onChange={handlePasswordChange} required minLength="6"
-                  className="w-full bg-transparent border-0 border-b border-outline focus:ring-0 focus:border-primary transition-colors py-3 font-technical text-sm placeholder:text-surface-variant tracking-wider"
-                  placeholder="••••••••"
-                />
-              </div>
-
-              <div className="pt-6">
-                <button type="submit" className="w-full bg-on-surface text-surface flex justify-center items-center gap-2 py-4 px-6 font-label text-xs tracking-[0.15em] font-bold uppercase transition-all hover:bg-outline active:scale-[0.98]">
-                  Update Security
-                </button>
-              </div>
-            </form>
           </div>
-
         </div>
       </div>
-    </main>
+
+      <div className="max-w-xl mx-auto px-4 py-8">
+        {/* Tabs */}
+        <div className="flex border-b border-outline-variant mb-6">
+          {['profile', 'password'].map(t => (
+            <button
+              key={t}
+              onClick={() => { setTab(t); setError(''); setSuccess(''); }}
+              className={`px-4 py-2.5 text-sm font-medium capitalize border-b-2 transition-colors -mb-px ${
+                tab === t ? 'border-primary text-primary' : 'border-transparent text-on-surface-variant hover:text-on-surface'
+              }`}
+            >
+              {t === 'profile' ? 'Profile Details' : 'Change Password'}
+            </button>
+          ))}
+        </div>
+
+        {error && (
+          <div className="mb-5 p-3 bg-error-container border border-error/20 rounded text-on-error-container text-sm flex items-center gap-2">
+            <span className="material-symbols-outlined text-error" style={{ fontSize: '18px' }}>error</span>
+            {error}
+          </div>
+        )}
+        {success && (
+          <div className="mb-5 p-3 bg-secondary-container/50 border border-secondary/20 rounded text-on-secondary-container text-sm flex items-center gap-2">
+            <span className="material-symbols-outlined text-secondary" style={{ fontSize: '18px' }}>check_circle</span>
+            {success}
+          </div>
+        )}
+
+        {tab === 'profile' && (
+          <form onSubmit={handleProfileSave} className="bg-surface-container-low border border-outline-variant rounded-lg p-6 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              {['firstName', 'lastName'].map(field => (
+                <div key={field}>
+                  <label className="block text-sm font-medium text-on-surface mb-1.5 capitalize">
+                    {field === 'firstName' ? 'First Name' : 'Last Name'}
+                  </label>
+                  <input name={field} type="text" required value={form[field]} onChange={handleChange}
+                    className="w-full px-3 py-2.5 bg-surface border border-outline-variant rounded text-on-surface text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors" />
+                </div>
+              ))}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-on-surface mb-1.5">Email</label>
+              <input name="email" type="email" required value={form.email} onChange={handleChange}
+                className="w-full px-3 py-2.5 bg-surface border border-outline-variant rounded text-on-surface text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-on-surface mb-1.5">Username</label>
+              <input type="text" value={user?.username || ''} disabled
+                className="w-full px-3 py-2.5 bg-surface-container border border-outline-variant rounded text-on-surface-variant text-sm opacity-60 cursor-not-allowed" />
+              <p className="font-technical text-xs text-on-surface-variant mt-1">Username cannot be changed.</p>
+            </div>
+            <div className="flex justify-end pt-2">
+              <button type="submit" disabled={saving}
+                className="px-6 py-2.5 bg-primary text-on-primary rounded text-sm font-medium hover:bg-primary-container transition-colors disabled:opacity-50 flex items-center gap-2">
+                {saving ? <><div className="w-4 h-4 border-2 border-on-primary border-t-transparent rounded-full animate-spin" />Saving…</> : 'Save Changes'}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {tab === 'password' && (
+          <form onSubmit={handlePasswordChange} className="bg-surface-container-low border border-outline-variant rounded-lg p-6 space-y-4">
+            {['currentPassword', 'newPassword', 'confirmPassword'].map((field, i) => (
+              <div key={field}>
+                <label className="block text-sm font-medium text-on-surface mb-1.5">
+                  {['Current Password', 'New Password', 'Confirm New Password'][i]}
+                </label>
+                <input name={field} type="password" required value={pwForm[field]} onChange={handlePwChange}
+                  className="w-full px-3 py-2.5 bg-surface border border-outline-variant rounded text-on-surface text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
+                  placeholder="••••••••" />
+              </div>
+            ))}
+            <div className="flex justify-end pt-2">
+              <button type="submit" disabled={saving}
+                className="px-6 py-2.5 bg-primary text-on-primary rounded text-sm font-medium hover:bg-primary-container transition-colors disabled:opacity-50 flex items-center gap-2">
+                {saving ? <><div className="w-4 h-4 border-2 border-on-primary border-t-transparent rounded-full animate-spin" />Updating…</> : 'Change Password'}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
   );
-}
+};
 
 export default Profile;

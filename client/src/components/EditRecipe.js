@@ -1,294 +1,227 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import API from '../config/api';
-import { toast } from '../utils/toast';
-import LoadingSpinner from './LoadingSpinner';
+import { useParams, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
-function EditRecipe() {
+const CATEGORIES = ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snack', 'Other'];
+const DIFFICULTIES = ['Easy', 'Medium', 'Hard'];
+
+const EditRecipe = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    category: 'Breakfast',
-    prepTime: '',
-    cookTime: '',
-    servings: '',
-    difficulty: 'Easy',
-    ingredients: '',
-    instructions: '',
-    image: ''
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  const [form, setForm] = useState({
+    title: '', description: '', category: 'Dinner', prepTime: '',
+    cookTime: '', servings: '', difficulty: 'Medium', image: '',
   });
+  const [ingredients, setIngredients] = useState([]);
+  const [instructions, setInstructions] = useState([]);
+  const [ingredientInput, setIngredientInput] = useState('');
+  const [instructionInput, setInstructionInput] = useState('');
 
   useEffect(() => {
-    fetchRecipe();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    axios.get(`/api/recipes/${id}`)
+      .then(({ data }) => {
+        setForm({
+          title: data.title || '',
+          description: data.description || '',
+          category: data.category || 'Dinner',
+          prepTime: data.prepTime || '',
+          cookTime: data.cookTime || '',
+          servings: data.servings || '',
+          difficulty: data.difficulty || 'Medium',
+          image: data.image || '',
+        });
+        setIngredients(data.ingredients || []);
+        setInstructions(data.instructions || []);
+      })
+      .catch(() => setError('Recipe not found or you do not have permission to edit it.'))
+      .finally(() => setLoading(false));
   }, [id]);
 
-  const getAuthConfig = () => {
-    const token = localStorage.getItem('token');
-    return { headers: { 'Authorization': `Bearer ${token}` } };
+  const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value });
+
+  const addIngredient = () => {
+    const val = ingredientInput.trim();
+    if (val) { setIngredients(prev => [...prev, val]); setIngredientInput(''); }
   };
 
-  const fetchRecipe = async () => {
-    try {
-      const response = await API.get(`/api/recipes/my-submissions`, getAuthConfig());
-      const recipe = response.data.find(r => r._id === id);
-      
-      if (!recipe) {
-        toast.error('Recipe not found');
-        navigate('/my-recipes');
-        return;
-      }
-
-      setFormData({
-        title: recipe.title,
-        description: recipe.description,
-        category: recipe.category,
-        prepTime: recipe.prepTime,
-        cookTime: recipe.cookTime,
-        servings: recipe.servings,
-        difficulty: recipe.difficulty,
-        ingredients: recipe.ingredients.join('\n'),
-        instructions: recipe.instructions.join('\n'),
-        image: recipe.image || ''
-      });
-      setLoading(false);
-    } catch (error) {
-      console.error('Error fetching recipe:', error);
-      toast.error('Failed to load recipe');
-      navigate('/my-recipes');
-    }
+  const addInstruction = () => {
+    const val = instructionInput.trim();
+    if (val) { setInstructions(prev => [...prev, val]); setInstructionInput(''); }
   };
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-  };
-
-  const handleSubmit = async (e) => {
+  const handleSubmit = async e => {
     e.preventDefault();
-    setIsSubmitting(true);
+    setError('');
+    if (ingredients.length === 0) { setError('At least one ingredient required.'); return; }
+    if (instructions.length === 0) { setError('At least one instruction required.'); return; }
 
-    const ingredientsArray = formData.ingredients.split('\n').map(item => item.trim()).filter(item => item.length > 0);
-    const instructionsArray = formData.instructions.split('\n').map(item => item.trim()).filter(item => item.length > 0);
-
-    const recipeData = {
-      ...formData,
-      prepTime: parseInt(formData.prepTime),
-      cookTime: parseInt(formData.cookTime),
-      servings: parseInt(formData.servings),
-      ingredients: ingredientsArray,
-      instructions: instructionsArray
-    };
-
+    setSaving(true);
     try {
-      await API.put(`/api/recipes/${id}`, recipeData, getAuthConfig());
-      toast.success('Recipe updated successfully!');
-      navigate('/my-recipes');
-    } catch (error) {
-      console.error('Error updating recipe:', error);
-      const errorMessage = error.response?.data?.message || 'Failed to update recipe. Please try again.';
-      toast.error(errorMessage);
+      await axios.put(`/api/recipes/${id}`, {
+        ...form,
+        prepTime: Number(form.prepTime),
+        cookTime: Number(form.cookTime),
+        servings: Number(form.servings),
+        ingredients, instructions,
+      });
+      setSuccess('Recipe updated successfully!');
+      setTimeout(() => navigate('/my-recipes'), 1500);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Update failed.');
     } finally {
-      setIsSubmitting(false);
+      setSaving(false);
     }
   };
 
   if (loading) {
-    return <LoadingSpinner />;
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
   }
 
   return (
-    <main className="pt-32 pb-24 px-6 relative overflow-hidden min-h-screen bg-surface">
-      <div className="absolute inset-0 grain-overlay pointer-events-none opacity-50 z-[0]"></div>
-      <div className="max-w-[800px] mx-auto relative z-10">
-        <div className="mb-12">
-          <span className="font-label text-xs tracking-[0.2em] text-primary mb-2 block font-medium">REVISE</span>
-          <h1 className="text-5xl md:text-6xl font-headline text-on-surface leading-tight tracking-tight">Refine Your Recipe</h1>
-          <p className="mt-4 text-on-surface-variant font-body max-w-lg leading-relaxed">Continuous improvement is the mark of a great chef. Make your adjustments and update your archive.</p>
+    <div className="min-h-screen bg-background">
+      <div className="bg-surface-container-low border-b border-outline-variant">
+        <div className="max-w-2xl mx-auto px-4 py-8">
+          <h1 className="font-headline text-4xl text-on-surface mb-1">Edit Recipe</h1>
+          <p className="text-on-surface-variant text-sm">Make changes to your submitted recipe.</p>
         </div>
-        
-        <form onSubmit={handleSubmit} className="bg-surface-container-lowest shadow-[0px_20px_40px_rgba(88,65,60,0.08)] p-8 md:p-12 border border-outline-variant/10">
-          <div className="space-y-10">
-            <div>
-              <label htmlFor="title" className="block font-label text-[10px] tracking-[0.15em] font-semibold text-outline uppercase mb-3">Recipe Title</label>
-              <input 
-                 type="text" 
-                 id="title" 
-                 name="title" 
-                 value={formData.title} 
-                 onChange={handleChange} 
-                 required
-                 className="w-full bg-transparent border-0 border-b border-outline focus:ring-0 focus:border-primary transition-colors py-3 text-2xl font-headline placeholder:text-surface-variant italic" 
-                 placeholder="e.g. Heirloom Tomato &amp; Basil Galette" 
-              />
-            </div>
-            
-            <div>
-              <label htmlFor="description" className="block font-label text-[10px] tracking-[0.15em] font-semibold text-outline uppercase mb-3">Description &amp; Story</label>
-              <textarea 
-                 id="description" 
-                 name="description" 
-                 value={formData.description} 
-                 onChange={handleChange} 
-                 required
-                 className="w-full bg-transparent border-0 border-b border-outline focus:ring-0 focus:border-primary transition-colors py-3 font-body placeholder:text-surface-variant resize-none" 
-                 placeholder="Briefly describe the flavor profile, origin, or why this recipe matters to you..." 
-                 rows="3"
-               />
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      </div>
+
+      <div className="max-w-2xl mx-auto px-4 py-8">
+        {error && (
+          <div className="mb-5 p-3 bg-error-container border border-error/20 rounded text-on-error-container text-sm flex items-center gap-2">
+            <span className="material-symbols-outlined text-error" style={{ fontSize: '18px' }}>error</span>
+            {error}
+          </div>
+        )}
+        {success && (
+          <div className="mb-5 p-3 bg-secondary-container/50 border border-secondary/20 rounded text-on-secondary-container text-sm flex items-center gap-2">
+            <span className="material-symbols-outlined text-secondary" style={{ fontSize: '18px' }}>check_circle</span>
+            {success}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <section className="bg-surface-container-low border border-outline-variant rounded-lg p-6">
+            <h2 className="font-headline text-xl text-on-surface mb-4">Basic Information</h2>
+            <div className="space-y-4">
               <div>
-                <label htmlFor="category" className="block font-label text-[10px] tracking-[0.15em] font-semibold text-outline uppercase mb-3">Category</label>
-                <select 
-                   id="category" 
-                   name="category" 
-                   value={formData.category} 
-                   onChange={handleChange} 
-                   required
-                   className="w-full bg-transparent border-0 border-b border-outline focus:ring-0 focus:border-primary transition-colors py-3 font-body cursor-pointer"
-                >
-                  <option value="Breakfast">Breakfast</option>
-                  <option value="Lunch">Lunch</option>
-                  <option value="Dinner">Dinner</option>
-                  <option value="Dessert">Dessert</option>
-                  <option value="Snack">Snack</option>
-                  <option value="Beverage">Beverage</option>
-                </select>
-              </div>
-              
-              <div>
-                <label htmlFor="difficulty" className="block font-label text-[10px] tracking-[0.15em] font-semibold text-outline uppercase mb-3">Difficulty Level</label>
-                <select 
-                   id="difficulty" 
-                   name="difficulty" 
-                   value={formData.difficulty} 
-                   onChange={handleChange} 
-                   required
-                   className="w-full bg-transparent border-0 border-b border-outline focus:ring-0 focus:border-primary transition-colors py-3 font-body cursor-pointer"
-                >
-                  <option value="Easy">Beginner (Easy)</option>
-                  <option value="Medium">Intermediate</option>
-                  <option value="Hard">Advanced Chef (Hard)</option>
-                </select>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-3 gap-8">
-              <div>
-                <label htmlFor="prepTime" className="block font-label text-[10px] tracking-[0.15em] font-semibold text-outline uppercase mb-3">Prep Time (min)</label>
-                <input 
-                   type="number" 
-                   id="prepTime" 
-                   name="prepTime" 
-                   value={formData.prepTime} 
-                   onChange={handleChange} 
-                   required min="0"
-                   className="w-full bg-transparent border-0 border-b border-outline focus:ring-0 focus:border-primary transition-colors py-3 font-body placeholder:text-surface-variant" 
-                />
+                <label htmlFor="title" className="block text-sm font-medium text-on-surface mb-1.5">Title *</label>
+                <input id="title" name="title" type="text" required value={form.title} onChange={handleChange}
+                  className="w-full px-3 py-2.5 bg-surface border border-outline-variant rounded text-on-surface text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors" />
               </div>
               <div>
-                <label htmlFor="cookTime" className="block font-label text-[10px] tracking-[0.15em] font-semibold text-outline uppercase mb-3">Cook Time (min)</label>
-                <input 
-                   type="number" 
-                   id="cookTime" 
-                   name="cookTime" 
-                   value={formData.cookTime} 
-                   onChange={handleChange} 
-                   required min="0"
-                   className="w-full bg-transparent border-0 border-b border-outline focus:ring-0 focus:border-primary transition-colors py-3 font-body placeholder:text-surface-variant" 
-                />
+                <label htmlFor="description" className="block text-sm font-medium text-on-surface mb-1.5">Description *</label>
+                <textarea id="description" name="description" rows={3} required value={form.description} onChange={handleChange}
+                  className="w-full px-3 py-2.5 bg-surface border border-outline-variant rounded text-on-surface text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors resize-none" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="category" className="block text-sm font-medium text-on-surface mb-1.5">Category</label>
+                  <select id="category" name="category" value={form.category} onChange={handleChange}
+                    className="w-full px-3 py-2.5 bg-surface border border-outline-variant rounded text-on-surface text-sm focus:outline-none focus:border-primary transition-colors">
+                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="difficulty" className="block text-sm font-medium text-on-surface mb-1.5">Difficulty</label>
+                  <select id="difficulty" name="difficulty" value={form.difficulty} onChange={handleChange}
+                    className="w-full px-3 py-2.5 bg-surface border border-outline-variant rounded text-on-surface text-sm focus:outline-none focus:border-primary transition-colors">
+                    {DIFFICULTIES.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                {['prepTime', 'cookTime', 'servings'].map(field => (
+                  <div key={field}>
+                    <label htmlFor={field} className="block text-sm font-medium text-on-surface mb-1.5 capitalize">
+                      {field === 'prepTime' ? 'Prep (min)' : field === 'cookTime' ? 'Cook (min)' : 'Servings'}
+                    </label>
+                    <input id={field} name={field} type="number" min="0" required value={form[field]} onChange={handleChange}
+                      className="w-full px-3 py-2.5 bg-surface border border-outline-variant rounded text-on-surface text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors" />
+                  </div>
+                ))}
               </div>
               <div>
-                <label htmlFor="servings" className="block font-label text-[10px] tracking-[0.15em] font-semibold text-outline uppercase mb-3">Servings</label>
-                <input 
-                   type="number" 
-                   id="servings" 
-                   name="servings" 
-                   value={formData.servings} 
-                   onChange={handleChange} 
-                   required min="1"
-                   className="w-full bg-transparent border-0 border-b border-outline focus:ring-0 focus:border-primary transition-colors py-3 font-body placeholder:text-surface-variant" 
-                />
+                <label htmlFor="image" className="block text-sm font-medium text-on-surface mb-1.5">Image URL</label>
+                <input id="image" name="image" type="url" value={form.image} onChange={handleChange}
+                  className="w-full px-3 py-2.5 bg-surface border border-outline-variant rounded text-on-surface text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors" />
               </div>
             </div>
-            
-            <div className="bg-surface-container-low p-6 rounded-sm">
-              <label htmlFor="ingredients" className="block font-label text-[10px] tracking-[0.15em] font-semibold text-outline uppercase mb-4">Ingredients (One per line)</label>
-              <div className="flex gap-4">
-                <span className="material-symbols-outlined text-outline-variant select-none pt-1">edit_note</span>
-                <textarea 
-                   id="ingredients" 
-                   name="ingredients" 
-                   value={formData.ingredients} 
-                   onChange={handleChange} 
-                   required
-                   className="w-full bg-transparent border-none focus:ring-0 font-technical text-sm leading-relaxed text-on-surface-variant placeholder:text-outline-variant/50 resize-none" 
-                   rows="6"
-                 ></textarea>
-              </div>
+          </section>
+
+          {/* Ingredients */}
+          <section className="bg-surface-container-low border border-outline-variant rounded-lg p-6">
+            <h2 className="font-headline text-xl text-on-surface mb-4">Ingredients</h2>
+            <div className="flex gap-2 mb-3">
+              <input type="text" value={ingredientInput} onChange={e => setIngredientInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addIngredient())}
+                placeholder="Add ingredient…"
+                className="flex-1 px-3 py-2.5 bg-surface border border-outline-variant rounded text-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors" />
+              <button type="button" onClick={addIngredient}
+                className="px-4 py-2.5 bg-primary text-on-primary rounded text-sm hover:bg-primary-container transition-colors">Add</button>
             </div>
-            
-            <div className="bg-surface-container-low p-6 rounded-sm">
-              <label htmlFor="instructions" className="block font-label text-[10px] tracking-[0.15em] font-semibold text-outline uppercase mb-4">Method &amp; Preparation (One step per line)</label>
-              <div className="flex gap-4">
-                <span className="material-symbols-outlined text-outline-variant select-none pt-1">format_list_numbered</span>
-                <textarea 
-                   id="instructions" 
-                   name="instructions" 
-                   value={formData.instructions} 
-                   onChange={handleChange} 
-                   required
-                   className="w-full bg-transparent border-none focus:ring-0 font-technical text-sm leading-relaxed text-on-surface-variant placeholder:text-outline-variant/50 resize-none" 
-                   rows="8"
-                 ></textarea>
-              </div>
+            <ul className="space-y-1.5">
+              {ingredients.map((ing, i) => (
+                <li key={i} className="flex items-center justify-between py-1.5 px-3 bg-surface border border-outline-variant rounded text-sm">
+                  <span className="text-on-surface">{ing}</span>
+                  <button type="button" onClick={() => setIngredients(prev => prev.filter((_, idx) => idx !== i))}
+                    className="text-on-surface-variant hover:text-error transition-colors" aria-label={`Remove ${ing}`}>
+                    <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>delete</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          {/* Instructions */}
+          <section className="bg-surface-container-low border border-outline-variant rounded-lg p-6">
+            <h2 className="font-headline text-xl text-on-surface mb-4">Instructions</h2>
+            <div className="flex gap-2 mb-3">
+              <textarea value={instructionInput} onChange={e => setInstructionInput(e.target.value)}
+                placeholder="Add step…" rows={2}
+                className="flex-1 px-3 py-2.5 bg-surface border border-outline-variant rounded text-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors resize-none" />
+              <button type="button" onClick={addInstruction}
+                className="px-4 py-2.5 bg-primary text-on-primary rounded text-sm hover:bg-primary-container transition-colors self-start">Add</button>
             </div>
-            
-            <div>
-              <label htmlFor="image" className="block font-label text-[10px] tracking-[0.15em] font-semibold text-outline uppercase mb-3">Recipe Hero Image URL</label>
-              <div className="flex items-center gap-3 border-b border-outline pb-2 group focus-within:border-primary transition-colors">
-                <span className="material-symbols-outlined text-outline group-focus-within:text-primary">add_photo_alternate</span>
-                <input 
-                   type="url" 
-                   id="image" 
-                   name="image" 
-                   value={formData.image} 
-                   onChange={handleChange}
-                   className="w-full bg-transparent border-0 focus:ring-0 py-1 font-body text-sm placeholder:text-surface-variant" 
-                />
-              </div>
-            </div>
-            
-            <div className="flex flex-col sm:flex-row gap-4 pt-6">
-              <button 
-                 type="submit" 
-                 disabled={isSubmitting}
-                 className="flex-1 bg-primary text-on-primary flex justify-center items-center gap-2 py-5 px-8 font-label text-sm tracking-[0.15em] font-bold uppercase transition-all hover:opacity-90 active:scale-[0.98] shadow-lg shadow-primary/20" 
-              >
-                  {isSubmitting ? (
-                    <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> Updating...</>
-                  ) : 'Update Archive'}
-              </button>
-              <button
-                type="button" 
-                onClick={() => navigate('/my-recipes')}
-                className="flex-[0.5] bg-surface text-on-surface border border-outline flex justify-center items-center gap-2 py-5 px-8 font-label text-sm tracking-[0.15em] font-bold uppercase transition-all hover:bg-surface-container active:scale-[0.98]"
-              >
-                Cancel
-              </button>
-            </div>
+            <ol className="space-y-2">
+              {instructions.map((step, i) => (
+                <li key={i} className="flex gap-3 py-2 px-3 bg-surface border border-outline-variant rounded text-sm">
+                  <span className="font-technical text-xs text-primary font-bold flex-shrink-0 mt-0.5">{i + 1}.</span>
+                  <span className="flex-1 text-on-surface-variant">{step}</span>
+                  <button type="button" onClick={() => setInstructions(prev => prev.filter((_, idx) => idx !== i))}
+                    className="text-on-surface-variant hover:text-error transition-colors" aria-label={`Remove step ${i + 1}`}>
+                    <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>delete</span>
+                  </button>
+                </li>
+              ))}
+            </ol>
+          </section>
+
+          <div className="flex gap-3 justify-end">
+            <button type="button" onClick={() => navigate('/my-recipes')}
+              className="px-6 py-2.5 border border-outline-variant text-on-surface-variant rounded text-sm hover:text-on-surface transition-colors">
+              Cancel
+            </button>
+            <button type="submit" disabled={saving}
+              className="px-6 py-2.5 bg-primary text-on-primary rounded text-sm font-medium hover:bg-primary-container transition-colors disabled:opacity-50 flex items-center gap-2">
+              {saving ? (
+                <><div className="w-4 h-4 border-2 border-on-primary border-t-transparent rounded-full animate-spin" />Saving…</>
+              ) : 'Save Changes'}
+            </button>
           </div>
         </form>
       </div>
-    </main>
+    </div>
   );
-}
+};
 
 export default EditRecipe;

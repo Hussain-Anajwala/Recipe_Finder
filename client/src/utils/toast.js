@@ -1,92 +1,79 @@
-// Simple toast notification utility
-export const toast = {
-  success: (message) => {
-    showToast(message, 'success');
-  },
-  error: (message) => {
-    showToast(message, 'error');
-  },
-  info: (message) => {
-    showToast(message, 'info');
-  },
-  warning: (message) => {
-    showToast(message, 'warning');
+/**
+ * Minimal toast utility — no external library needed.
+ * Injects toasts into a #toast-root container at the bottom of the page.
+ */
+
+const CONTAINER_ID = 'savour-toasts';
+
+function getContainer() {
+  let el = document.getElementById(CONTAINER_ID);
+  if (!el) {
+    el = document.createElement('div');
+    el.id = CONTAINER_ID;
+    el.style.cssText = `
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    `;
+    document.body.appendChild(el);
   }
-};
+  return el;
+}
 
-function showToast(message, type) {
-  // Remove existing toasts
-  const existingToasts = document.querySelectorAll('.custom-toast');
-  existingToasts.forEach(toast => toast.remove());
+function show(message, type = 'info') {
+  const container = getContainer();
 
-  // Create toast element
-  const toastEl = document.createElement('div');
-  toastEl.className = `custom-toast custom-toast-${type}`;
-  toastEl.textContent = message;
+  const colors = {
+    success: { bg: '#1e4620', text: '#fff', icon: '✓' },
+    error:   { bg: '#7f1d1d', text: '#fff', icon: '✕' },
+    info:    { bg: '#1e293b', text: '#fff', icon: 'ℹ' },
+  };
+  const { bg, text, icon } = colors[type] || colors.info;
 
-  // Style the toast
-  Object.assign(toastEl.style, {
-    position: 'fixed',
-    top: '20px',
-    right: '20px',
-    padding: '16px 24px',
-    borderRadius: '8px',
-    color: 'white',
-    fontSize: '14px',
-    fontWeight: '500',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-    zIndex: '10000',
-    animation: 'slideIn 0.3s ease-out',
-    minWidth: '250px',
-    maxWidth: '400px'
+  const el = document.createElement('div');
+  el.style.cssText = `
+    background: ${bg};
+    color: ${text};
+    padding: 12px 18px;
+    border-radius: 2px;
+    font-family: 'Jost', sans-serif;
+    font-size: 13px;
+    letter-spacing: 0.03em;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 240px;
+    max-width: 380px;
+    pointer-events: auto;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.25);
+  `;
+  el.innerHTML = `<span style="font-size:15px;flex-shrink:0">${icon}</span><span>${message}</span>`;
+  container.appendChild(el);
+
+  // Animate in
+  requestAnimationFrame(() => {
+    el.style.opacity = '1';
+    el.style.transform = 'translateY(0)';
   });
 
-  // Set background color based on type
-  const colors = {
-    success: '#27ae60',
-    error: '#e74c3c',
-    info: '#3498db',
-    warning: '#f39c12'
-  };
-  toastEl.style.background = colors[type] || colors.info;
-
-  // Add animation keyframes if not already added
-  if (!document.querySelector('#toast-animations')) {
-    const style = document.createElement('style');
-    style.id = 'toast-animations';
-    style.textContent = `
-      @keyframes slideIn {
-        from {
-          transform: translateX(400px);
-          opacity: 0;
-        }
-        to {
-          transform: translateX(0);
-          opacity: 1;
-        }
-      }
-      @keyframes slideOut {
-        from {
-          transform: translateX(0);
-          opacity: 1;
-        }
-        to {
-          transform: translateX(400px);
-          opacity: 0;
-        }
-      }
-    `;
-    document.head.appendChild(style);
-  }
-
-  // Add to document
-  document.body.appendChild(toastEl);
-
-  // Auto remove after 3 seconds
+  // Auto-remove after 4s
   setTimeout(() => {
-    toastEl.style.animation = 'slideOut 0.3s ease-out';
-    setTimeout(() => {
-      toastEl.remove();
-    }, 300);
-  }, 3000);
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(8px)';
+    setTimeout(() => el.remove(), 250);
+  }, 4000);
 }
+
+export const toast = {
+  success: (msg) => show(msg, 'success'),
+  error:   (msg) => show(msg, 'error'),
+  info:    (msg) => show(msg, 'info'),
+};

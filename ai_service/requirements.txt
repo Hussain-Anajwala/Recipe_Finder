@@ -1,0 +1,16 @@
+fastapi
+uvicorn[standard]
+ultralytics
+transformers
+sentence-transformers
+chromadb
+openai-whisper
+spacy
+torch
+torchvision
+Pillow
+python-multipart
+pymongo
+python-dotenv
+numpy
+httpx

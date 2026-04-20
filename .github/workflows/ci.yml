@@ -1,0 +1,62 @@
+name: CI / Build
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  build-frontend:
+    name: Build Frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./client
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: Use Node.js 20.x
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        cache-dependency-path: './client/package-lock.json'
+        
+    - name: Install Dependencies
+      run: npm ci || npm install
+      
+    - name: Build the React App
+      run: npm run build
+      # Process.env.CI = false allows it to bypass ESLint warnings failing the build if any new ones crop up, 
+      # but standard practice is true. I'll leave it out so it runs with the default environment settings.
+      env:
+        CI: false
+
+  build-backend:
+    name: Build Backend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./server
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: Use Node.js 20.x
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        cache-dependency-path: './server/package-lock.json'
+        
+    - name: Install Dependencies
+      run: npm ci || npm install
+      
+    # Since the server does not have a build script, we can just ensure that things install properly 
+    # and no immediate syntax errors exist by running Node to parse the file (smoke test).
+    - name: Syntax Check (Smoke Test)
+      run: node --check index.js

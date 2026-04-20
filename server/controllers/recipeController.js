@@ -2,25 +2,19 @@
 
 import Recipe from '../models/Recipe.js';
 import fetch from 'node-fetch';
+import crypto from 'crypto';
+import mongoose from 'mongoose';
+
+const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
 
 // Helper function to get nutrition data
 async function fetchNutrition(title, ingredients) {
   try {
-    console.log('Fetching nutrition for:', title);
-    
     const response = await fetch(
       `https://api.spoonacular.com/recipes/guessNutrition?apiKey=${process.env.SPOONACULAR_API_KEY}&title=${encodeURIComponent(title)}`
     );
-    
-    if (!response.ok) {
-      console.error('Spoonacular API error:', response.status, response.statusText);
-      return generateEstimatedNutrition(ingredients);
-    }
-    
+    if (!response.ok) return generateEstimatedNutrition(ingredients);
     const data = await response.json();
-    console.log('Spoonacular response:', data);
-    
-    // Check if we got valid data
     if (data.calories && data.calories.value) {
       return {
         calories: data.calories.value || 0,
@@ -28,12 +22,10 @@ async function fetchNutrition(title, ingredients) {
         fat: data.fat?.value || 0,
         carbs: data.carbs?.value || 0,
       };
-    } else {
-      // If API doesn't return proper data, use estimation
-      return generateEstimatedNutrition(ingredients);
     }
+    return generateEstimatedNutrition(ingredients);
   } catch (err) {
-    console.error("Spoonacular API error:", err.message);
+    console.error('Spoonacular API error:', err.message);
     return generateEstimatedNutrition(ingredients);
   }
 }
@@ -41,37 +33,59 @@ async function fetchNutrition(title, ingredients) {
 // Fallback: Generate estimated nutrition based on ingredients count
 function generateEstimatedNutrition(ingredients) {
   const ingredientCount = ingredients.length;
-  // Simple estimation: more ingredients = more calories
   const baseCalories = 150;
   const caloriesPerIngredient = 50;
-  
   const estimatedCalories = baseCalories + (ingredientCount * caloriesPerIngredient);
-  
   return {
     calories: estimatedCalories,
-    protein: Math.round(estimatedCalories * 0.15 / 4), // 15% of calories from protein (4 cal/g)
-    fat: Math.round(estimatedCalories * 0.30 / 9), // 30% of calories from fat (9 cal/g)
-    carbs: Math.round(estimatedCalories * 0.55 / 4), // 55% of calories from carbs (4 cal/g)
+    protein: Math.round(estimatedCalories * 0.15 / 4),
+    fat: Math.round(estimatedCalories * 0.30 / 9),
+    carbs: Math.round(estimatedCalories * 0.55 / 4),
   };
+}
+
+// ── Feature 4: Async AI auto-tagging ─────────────────────────────
+// Called after recipe save — does NOT block the response
+async function autoTagRecipe(recipeId, title, ingredients, description) {
+  try {
+    const response = await fetch(`${AI_SERVICE_URL}/ai/tag-recipe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, ingredients, description }),
+    });
+    if (!response.ok) return;
+    const { tags, scores } = await response.json();
+    if (tags && tags.length > 0) {
+      await Recipe.findByIdAndUpdate(recipeId, {
+        dietaryTags: tags,
+        aiTagConfidence: scores || {},
+      });
+      console.log(`✅ Auto-tagged recipe ${recipeId}:`, tags);
+    }
+  } catch (err) {
+    // Silently fail — AI service may not be running
+    console.warn('AI auto-tagging skipped (service unavailable):', err.message);
+  }
 }
 
 // @desc    Submit a new recipe for review
 // @route   POST /api/recipes/submit
 export const submitRecipe = async (req, res) => {
   try {
-    const { title, description, category, prepTime, cookTime, servings, difficulty, ingredients, instructions } = req.body;
-
-    // Fetch nutrition data automatically
+    const { title, description, ingredients } = req.body;
     const nutrition = await fetchNutrition(title, ingredients);
 
     const recipe = new Recipe({
       ...req.body,
-      submittedBy: req.user.id, // Get user ID from our 'protect' middleware
+      submittedBy: req.user.id,
       nutrition,
     });
 
     const createdRecipe = await recipe.save();
     res.status(201).json(createdRecipe);
+
+    // Feature 4: Fire-and-forget async tagging (after response sent)
+    autoTagRecipe(createdRecipe._id, title, ingredients, description);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -92,11 +106,9 @@ export const getMySubmissions = async (req, res) => {
 // @route   GET /api/recipes
 export const getAllApprovedRecipes = async (req, res) => {
   try {
-    // We only find recipes with the status 'approved'
     const recipes = await Recipe.find({ status: 'approved' })
-      .populate('submittedBy', 'firstName lastName') // Get the author's name
+      .populate('submittedBy', 'firstName lastName')
       .sort({ createdAt: -1 });
-
     res.json(recipes);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -109,12 +121,9 @@ export const getSingleRecipe = async (req, res) => {
   try {
     const recipe = await Recipe.findById(req.params.id)
       .populate('submittedBy', 'firstName lastName');
-
-    // Crucially, check if the recipe exists AND is approved
     if (recipe && recipe.status === 'approved') {
       res.json(recipe);
     } else {
-      // If not found or not approved, return a 404 error
       res.status(404).json({ message: 'Recipe not found or is not approved.' });
     }
   } catch (error) {
@@ -127,18 +136,11 @@ export const getSingleRecipe = async (req, res) => {
 export const deleteMyRecipe = async (req, res) => {
   try {
     const recipe = await Recipe.findById(req.params.id);
-
-    if (!recipe) {
-      return res.status(404).json({ message: 'Recipe not found' });
-    }
-
-    // Check if the recipe belongs to the logged-in user
+    if (!recipe) return res.status(404).json({ message: 'Recipe not found' });
     if (recipe.submittedBy.toString() !== req.user.id) {
       return res.status(403).json({ message: 'You can only delete your own recipes' });
     }
-
     await Recipe.findByIdAndDelete(req.params.id);
-
     res.json({ message: 'Recipe deleted successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -150,25 +152,18 @@ export const deleteMyRecipe = async (req, res) => {
 export const editMyRecipe = async (req, res) => {
   try {
     const recipe = await Recipe.findById(req.params.id);
-
-    if (!recipe) {
-      return res.status(404).json({ message: 'Recipe not found' });
-    }
-
-    // Check if the recipe belongs to the logged-in user
+    if (!recipe) return res.status(404).json({ message: 'Recipe not found' });
     if (recipe.submittedBy.toString() !== req.user.id) {
       return res.status(403).json({ message: 'You can only edit your own recipes' });
     }
 
     const { title, description, category, prepTime, cookTime, servings, difficulty, ingredients, instructions, image } = req.body;
 
-    // If title or ingredients changed, recalculate nutrition
     let nutrition = recipe.nutrition;
     if (title !== recipe.title || JSON.stringify(ingredients) !== JSON.stringify(recipe.ingredients)) {
       nutrition = await fetchNutrition(title, ingredients);
     }
 
-    // Update recipe fields
     recipe.title = title;
     recipe.description = description;
     recipe.category = category;
@@ -180,8 +175,7 @@ export const editMyRecipe = async (req, res) => {
     recipe.instructions = instructions;
     recipe.image = image;
     recipe.nutrition = nutrition;
-    
-    // Reset status to pending if it was rejected
+
     if (recipe.status === 'rejected') {
       recipe.status = 'pending';
       recipe.adminNotes = '';
@@ -190,27 +184,25 @@ export const editMyRecipe = async (req, res) => {
     }
 
     await recipe.save();
+    res.json({ message: 'Recipe updated successfully', recipe });
 
-    res.json({ 
-      message: 'Recipe updated successfully', 
-      recipe 
-    });
+    // Re-tag on significant edit
+    autoTagRecipe(recipe._id, title, ingredients, description);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-// @desc    Search recipes by ingredients
-// @route   GET /api/recipes/search?ingredients=chicken,tomato,onion
+// @desc    Search recipes by ingredients (Feature 2: with threshold filtering)
+// @route   GET /api/recipes/search?ingredients=chicken,tomato&threshold=30
 export const searchRecipesByIngredients = async (req, res) => {
   try {
-    const { ingredients } = req.query;
+    const { ingredients, threshold } = req.query;
 
     if (!ingredients) {
       return res.status(400).json({ message: 'Please provide ingredients to search' });
     }
 
-    // Split ingredients by comma and trim whitespace
     const searchIngredients = ingredients
       .split(',')
       .map(ing => ing.trim().toLowerCase())
@@ -220,51 +212,111 @@ export const searchRecipesByIngredients = async (req, res) => {
       return res.status(400).json({ message: 'Please provide valid ingredients' });
     }
 
+    // Parse threshold (default 30%)
+    const thresholdValue = Math.min(100, Math.max(0, parseInt(threshold) || 30));
+
     // Find approved recipes that contain ANY of the searched ingredients
-    const recipes = await Recipe.find({ 
+    const recipes = await Recipe.find({
       status: 'approved',
-      ingredients: { 
-        $elemMatch: { 
-          $regex: searchIngredients.join('|'), 
-          $options: 'i' 
-        } 
+      ingredients: {
+        $elemMatch: {
+          $regex: searchIngredients.join('|'),
+          $options: 'i'
+        }
       }
     })
     .populate('submittedBy', 'firstName lastName')
     .sort({ createdAt: -1 });
 
-    // Calculate match score for each recipe
+    // Calculate match scores
     const recipesWithScore = recipes.map(recipe => {
+      const recipeIngs = recipe.ingredients;
       let matchCount = 0;
-      
-      // Count how many of the recipe's ingredients match the search
-      recipe.ingredients.forEach(recipeIng => {
-        const hasMatch = searchIngredients.some(searchIng => 
+      const matchedIngredients = [];
+
+      recipeIngs.forEach(recipeIng => {
+        const hasMatch = searchIngredients.some(searchIng =>
           recipeIng.toLowerCase().includes(searchIng)
         );
-        if (hasMatch) matchCount++;
+        if (hasMatch) {
+          matchCount++;
+          matchedIngredients.push(recipeIng);
+        }
       });
 
-      // Calculate percentage based on recipe's total ingredients
-      const matchPercentage = Math.round((matchCount / recipe.ingredients.length) * 100);
+      // Primary: % of recipe ingredients that matched
+      const matchPercentage = Math.round((matchCount / recipeIngs.length) * 100);
+
+      // Secondary: % of searched ingredients found in recipe (coverage)
+      let coveredSearchIngredients = 0;
+      searchIngredients.forEach(searchIng => {
+        const found = recipeIngs.some(ri => ri.toLowerCase().includes(searchIng));
+        if (found) coveredSearchIngredients++;
+      });
+      const coveragePercentage = Math.round((coveredSearchIngredients / searchIngredients.length) * 100);
+
+      // Combined score: match% weighted 60% + coverage% weighted 40%
+      const combinedScore = (matchPercentage * 0.6) + (coveragePercentage * 0.4);
 
       return {
         ...recipe.toObject(),
         matchScore: matchCount,
-        matchPercentage: matchPercentage,
-        totalIngredients: recipe.ingredients.length
+        matchPercentage,
+        coveragePercentage,
+        combinedScore,
+        totalIngredients: recipeIngs.length,
+        matchedIngredients, // which ingredients were found (for UI highlighting)
+        searchedIngredients, // echo back for frontend
       };
     });
 
-    // Sort by match score (highest first)
-    recipesWithScore.sort((a, b) => b.matchScore - a.matchScore);
+    // Feature 2: Filter by threshold
+    const filtered = recipesWithScore.filter(r => r.matchPercentage >= thresholdValue);
+
+    // Sort by combined score (highest first)
+    filtered.sort((a, b) => b.combinedScore - a.combinedScore);
+
+    // Ethics: always tell user how many were hidden
+    const hiddenCount = recipesWithScore.length - filtered.length;
 
     res.json({
-      searchedIngredients: searchIngredients,
-      totalResults: recipesWithScore.length,
-      recipes: recipesWithScore
+      searchedIngredients,
+      totalResults: filtered.length,
+      totalBeforeFilter: recipesWithScore.length,
+      hiddenByThreshold: hiddenCount,
+      threshold_used: thresholdValue,
+      recipes: filtered,
     });
 
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// ── Feature 4 (Ethics): Report an incorrect dietary tag ──────────
+// @desc    Report an incorrect AI-generated tag
+// @route   POST /api/recipes/:id/report-tag
+export const reportTag = async (req, res) => {
+  try {
+    const { reportedTag, suggestedCorrection } = req.body;
+    const recipeId = req.params.id;
+
+    if (!reportedTag) {
+      return res.status(400).json({ message: 'reportedTag is required' });
+    }
+
+    // Store in raw MongoDB collection (no Mongoose model needed)
+    const db = mongoose.connection.db;
+    await db.collection('tag_reports').insertOne({
+      recipeId: new mongoose.Types.ObjectId(recipeId),
+      userId: new mongoose.Types.ObjectId(req.user.id),
+      reportedTag,
+      suggestedCorrection: suggestedCorrection || null,
+      createdAt: new Date(),
+      resolved: false,
+    });
+
+    res.status(201).json({ message: 'Thank you — your report has been submitted for admin review.' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

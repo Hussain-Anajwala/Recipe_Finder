@@ -20,12 +20,22 @@ const recipeSchema = new Schema({
   submittedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   reviewedBy: { type: Schema.Types.ObjectId, ref: 'User' },
   adminNotes: { type: String },
-  nutrition: { // We'll keep the auto-calculated nutrition
+  nutrition: {
     calories: { type: Number, default: 0 },
     protein: { type: Number, default: 0 },
     fat: { type: Number, default: 0 },
     carbs: { type: Number, default: 0 },
-  }
+  },
+  // ── AI Feature Fields ─────────────────────────────────
+  // Feature 4: Automated Dietary Tagging
+  dietaryTags: [{ type: String }],
+  aiTagConfidence: {
+    type: Map,
+    of: Number,
+    default: {}
+  },
+  // Feature 3: Content-Based Recommendations
+  embeddingUpdatedAt: { type: Date },
 }, { timestamps: true });
 
 export default mongoose.model('Recipe', recipeSchema);

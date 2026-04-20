@@ -8,6 +8,7 @@ import {
   approveRecipe,
   rejectRecipe,
   getAllUsers,
+  updateUserRole,
   deleteUser,
   editRecipe,
   deleteRecipe
@@ -36,6 +37,7 @@ router.put('/submissions/:id/reject', rejectRecipe);
 
 // User management
 router.get('/users', getAllUsers);
+router.put('/users/:id/role', updateUserRole);  // ← role toggle
 router.delete('/users/:id', deleteUser);
 
 // Recipe management

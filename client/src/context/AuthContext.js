@@ -1,65 +1,65 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { jwtDecode } from 'jwt-decode';
+import axios from 'axios';
 
-export const AuthContext = createContext();
-
-// Custom hook to use auth context
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
+const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const [token, setToken] = useState(localStorage.getItem('token'));
   const [loading, setLoading] = useState(true);
 
-  // Check for token on mount
+  // Set axios default auth header
   useEffect(() => {
-    const token = localStorage.getItem('token');
     if (token) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       try {
         const decoded = jwtDecode(token);
-        // Check if token is expired
+        // Check expiry
         if (decoded.exp * 1000 < Date.now()) {
-          localStorage.removeItem('token');
-          setUser(null);
+          logout();
         } else {
-          setUser(decoded);
+          // Fetch fresh user profile
+          axios.get('/api/auth/profile')
+            .then(res => setUser(res.data))
+            .catch(() => logout())
+            .finally(() => setLoading(false));
         }
-      } catch (error) {
-        console.error('Invalid token:', error);
-        localStorage.removeItem('token');
-        setUser(null);
+      } catch {
+        logout();
+        setLoading(false);
       }
+    } else {
+      delete axios.defaults.headers.common['Authorization'];
+      setLoading(false);
     }
-    setLoading(false);
-  }, []);
+  }, [token]);
 
-  const login = (token, userData) => {
-    localStorage.setItem('token', token);
-    const decoded = jwtDecode(token);
-    setUser({ ...decoded, ...userData });
+  const login = (tokenValue, userData) => {
+    localStorage.setItem('token', tokenValue);
+    axios.defaults.headers.common['Authorization'] = `Bearer ${tokenValue}`;
+    setToken(tokenValue);
+    setUser(userData);
   };
 
   const logout = () => {
     localStorage.removeItem('token');
+    delete axios.defaults.headers.common['Authorization'];
+    setToken(null);
     setUser(null);
   };
 
-  const isAdmin = () => {
-    return user && user.role === 'admin';
-  };
-
-  const isAuthenticated = () => {
-    return user !== null;
-  };
-
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAdmin, isAuthenticated, loading }}>
+    <AuthContext.Provider value={{ user, token, login, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );
 };
+
+export const useAuth = () => {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  return ctx;
+};
+
+export default AuthContext;
