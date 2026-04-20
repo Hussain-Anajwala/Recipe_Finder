@@ -196,6 +196,9 @@ export const editMyRecipe = async (req, res) => {
 // @desc    Search recipes by ingredients (Feature 2: with threshold filtering)
 // @route   GET /api/recipes/search?ingredients=chicken,tomato&threshold=30
 export const searchRecipesByIngredients = async (req, res) => {
+  // ── Tunable constant: minimum % of recipe ingredients user must have ──
+  const MIN_COVERAGE_THRESHOLD = 30;
+
   try {
     const { ingredients, threshold } = req.query;
 
@@ -212,8 +215,9 @@ export const searchRecipesByIngredients = async (req, res) => {
       return res.status(400).json({ message: 'Please provide valid ingredients' });
     }
 
-    // Parse threshold (default 30%)
-    const thresholdValue = Math.min(100, Math.max(0, parseInt(threshold) || 30));
+    // User-supplied threshold — floored at MIN_COVERAGE_THRESHOLD
+    const requestedThreshold = Math.min(100, Math.max(0, parseInt(threshold) || MIN_COVERAGE_THRESHOLD));
+    const thresholdValue = Math.max(MIN_COVERAGE_THRESHOLD, requestedThreshold);
 
     // Find approved recipes that contain ANY of the searched ingredients
     const recipes = await Recipe.find({
@@ -244,37 +248,30 @@ export const searchRecipesByIngredients = async (req, res) => {
         }
       });
 
-      // Primary: % of recipe ingredients that matched
+      // ── Score A: ingredientCoverage — how much of this recipe can the user make?
+      //    matchCount / recipe ingredient count × 100
       const matchPercentage = Math.round((matchCount / recipeIngs.length) * 100);
 
-      // Secondary: % of searched ingredients found in recipe (coverage)
-      let coveredSearchIngredients = 0;
-      searchIngredients.forEach(searchIng => {
-        const found = recipeIngs.some(ri => ri.toLowerCase().includes(searchIng));
-        if (found) coveredSearchIngredients++;
-      });
-      const coveragePercentage = Math.round((coveredSearchIngredients / searchIngredients.length) * 100);
-
-      // Combined score: match% weighted 60% + coverage% weighted 40%
-      const combinedScore = (matchPercentage * 0.6) + (coveragePercentage * 0.4);
+      // ── Score B: pantryUtilization — how many pantry items does this recipe use?
+      //    matchCount / user's pantry size × 100
+      const pantryUtilization = Math.round((matchCount / searchIngredients.length) * 100);
 
       return {
         ...recipe.toObject(),
         matchScore: matchCount,
-        matchPercentage,
-        coveragePercentage,
-        combinedScore,
+        matchPercentage,       // primary sort key — ingredient coverage
+        pantryUtilization,     // secondary metric — pantry items consumed
         totalIngredients: recipeIngs.length,
         matchedIngredients,
-        searchedIngredients: searchIngredients, // echo back for frontend
+        searchedIngredients: searchIngredients,
       };
     });
 
-    // Feature 2: Filter by threshold
+    // Filter: user must cover at least MIN_COVERAGE_THRESHOLD% of recipe ingredients
     const filtered = recipesWithScore.filter(r => r.matchPercentage >= thresholdValue);
 
-    // Sort by combined score (highest first)
-    filtered.sort((a, b) => b.combinedScore - a.combinedScore);
+    // Sort by ingredientCoverage descending (highest coverage = most makeable recipe first)
+    filtered.sort((a, b) => b.matchPercentage - a.matchPercentage);
 
     // Ethics: always tell user how many were hidden
     const hiddenCount = recipesWithScore.length - filtered.length;
@@ -283,12 +280,13 @@ export const searchRecipesByIngredients = async (req, res) => {
       searchedIngredients: searchIngredients,
       totalResults: filtered.length,
       totalBeforeFilter: recipesWithScore.length,
-      hiddenByThreshold: hiddenCount,
+      hiddenByThreshold: recipesWithScore.length - filtered.length,
       threshold_used: thresholdValue,
       recipes: filtered,
     });
 
   } catch (error) {
+    console.error('[searchRecipesByIngredients]', error.stack);
     res.status(500).json({ error: error.message });
   }
 };

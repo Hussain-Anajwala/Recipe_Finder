@@ -34,12 +34,22 @@ export const getAllSubmissions = async (req, res) => {
     const filter = status ? { status } : {};
 
     const recipes = await Recipe.find(filter)
-      .populate('submittedBy', 'firstName lastName email')
-      .populate('reviewedBy', 'firstName lastName')
+      .populate({ path: 'submittedBy', select: 'firstName lastName email', options: { strictPopulate: false } })
+      .populate({ path: 'reviewedBy',  select: 'firstName lastName',        options: { strictPopulate: false } })
       .sort({ createdAt: -1 });
 
-    res.json(recipes);
+    // Gracefully handle orphaned references (user was deleted after submitting)
+    const safeRecipes = recipes.map(r => {
+      const obj = r.toObject();
+      if (!obj.submittedBy) {
+        obj.submittedBy = { firstName: 'Deleted', lastName: 'User', email: '' };
+      }
+      return obj;
+    });
+
+    res.json(safeRecipes);
   } catch (error) {
+    console.error('[getAllSubmissions]', error.stack);
     res.status(500).json({ error: error.message });
   }
 };
@@ -57,12 +67,13 @@ export const approveRecipe = async (req, res) => {
     }
 
     recipe.status = 'approved';
-    recipe.reviewedBy = req.user.id; // Admin who approved it
+    recipe.reviewedBy = req.user._id; // use ._id (ObjectId) not .id (string)
     recipe.adminNotes = adminNotes || '';
 
     const updatedRecipe = await recipe.save();
     res.json(updatedRecipe);
   } catch (error) {
+    console.error('[approveRecipe]', error.stack);
     res.status(500).json({ error: error.message });
   }
 };
@@ -80,12 +91,13 @@ export const rejectRecipe = async (req, res) => {
     }
 
     recipe.status = 'rejected';
-    recipe.reviewedBy = req.user.id; // Admin who rejected it
+    recipe.reviewedBy = req.user._id; // use ._id (ObjectId) not .id (string)
     recipe.adminNotes = adminNotes || '';
 
     const updatedRecipe = await recipe.save();
     res.json(updatedRecipe);
   } catch (error) {
+    console.error('[rejectRecipe]', error.stack);
     res.status(500).json({ error: error.message });
   }
 };
@@ -201,18 +213,18 @@ export const editRecipe = async (req, res) => {
     // Admin can also change status
     if (status) {
       recipe.status = status;
-      recipe.reviewedBy = req.user.id; // Admin who made the change
+      recipe.reviewedBy = req.user._id; // use ._id (ObjectId) not .id (string)
     }
 
     // If title or ingredients changed, recalculate nutrition
     if (title !== recipe.title || JSON.stringify(ingredients) !== JSON.stringify(recipe.ingredients)) {
       // You can add nutrition recalculation here if needed
-      // nutrition = await fetchNutrition(title, ingredients);
     }
 
     const updatedRecipe = await recipe.save();
     res.json(updatedRecipe);
   } catch (error) {
+    console.error('[editRecipe]', error.stack);
     res.status(500).json({ error: error.message });
   }
 };
