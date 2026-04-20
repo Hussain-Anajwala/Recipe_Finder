@@ -36,6 +36,16 @@ async def lifespan(app: FastAPI):
     # Connect to MongoDB
     db = get_db()
 
+    # Feature 3: Warm up sentence-transformer BEFORE accepting requests.
+    # Loading happens here so the first /ai/similar-recipes call is never a cold start.
+    try:
+        print("🔄 Loading sentence transformer model (all-MiniLM-L6-v2)...")
+        from models.recommender import _load_embedding_model
+        _load_embedding_model()  # force weight loading — blocking, intentional
+        print("✅ Sentence transformer ready")
+    except Exception as e:
+        print(f"⚠️  Sentence transformer load warning (non-critical): {e}")
+
     # Feature 3: Build ChromaDB index on first run (persisted to disk)
     try:
         from models.recommender import build_index, _get_chroma

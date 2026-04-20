@@ -98,15 +98,58 @@ router.post('/voice-to-ingredients', protect, (req, res) => {
   proxyMultipart(req, res, '/ai/voice-to-ingredients');
 });
 
-// ── POST /api/ai/recommend ─────────────────────────────────────
-// Body: { recipe_id, limit }
-// Returns: { recommendations: [...] }
-router.post('/recommend', protect, (req, res) => {
-  proxyJSON(req, res, '/ai/recommend');
+// ── POST /api/ai/recommend ─────────────────────────────────────────
+// Body: { recipe_id, top_k? }
+// FastAPI endpoint: POST /ai/similar-recipes
+// Returns: { similar: [{ recipe_id, similarity_score, title, category }] }
+router.post('/recommend', protect, async (req, res) => {
+  const { recipe_id, title, ingredients, limit } = req.body;
+
+  // FastAPI /ai/similar-recipes expects: { recipe_id, top_k }
+  const fastapiBody = {
+    recipe_id,
+    top_k: limit || 3,
+  };
+
+  const callFastAPI = async () =>
+    fetch(`${AI_SERVICE_URL}/ai/similar-recipes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(fastapiBody),
+    });
+
+  try {
+    let response = await callFastAPI();
+
+    // Cold-start retry: model may still be loading on first request
+    if (response.status === 500) {
+      console.log('[recommend] FastAPI returned 500 — cold start? Retrying in 3s…');
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      response = await callFastAPI();
+    }
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return res.status(response.status).json({ error: 'Recommendation failed', details: errorText });
+    }
+
+    const data = await response.json();
+    return res.json(data);
+
+  } catch (err) {
+    if (isServiceDown(err)) {
+      return res.status(503).json({
+        error: 'AI service unavailable',
+        message: 'The AI microservice is not running. Start it with: cd ai_service && uvicorn main:app --port 8000',
+        code: 'AI_SERVICE_DOWN',
+      });
+    }
+    console.error('[recommend] Proxy error:', err.stack);
+    return res.status(500).json({ error: err.message });
+  }
 });
 
-// ── GET /api/ai/similar/:recipeId ─────────────────────────────
-// Returns: { similar: [{ recipe_id, similarity_score, title, category }, ...] }
+// ── GET /api/ai/similar/:recipeId (legacy alias, kept for backwards compat) ──
 router.get('/similar/:recipeId', async (req, res) => {
   req.body = { recipe_id: req.params.recipeId, top_k: 4 };
   proxyJSON(req, res, '/ai/similar-recipes');

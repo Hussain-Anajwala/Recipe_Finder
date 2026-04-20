@@ -137,27 +137,41 @@ const TagReportModal = ({ recipeId, tag, onClose, onSuccess }) => {
 };
 
 // ── Recommendation Row ─────────────────────────────────────────
-const RecommendationRow = ({ recipeId, onSelectRecipe }) => {
+const RecommendationRow = ({ recipeId, recipeTitle, recipeIngredients, onSelectRecipe }) => {
   const [similar, setSimilar] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!recipeId) return;
     let mounted = true;
-    const fetchSimilar = async () => {
-      setLoading(true);
-      try {
-        const { data } = await API.get(`/api/ai/similar/${recipeId}`);
-        if (mounted) setSimilar(data.similar || []);
-      } catch (err) {
-        // Silent fail for 503 / AI_SERVICE_DOWN — hide section entirely
-        if (mounted) setSimilar([]);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-    fetchSimilar();
+    setSimilar([]);
+    setLoading(true);
+
+    API.post('/api/ai/recommend', {
+      recipe_id: recipeId,
+      title: recipeTitle,
+      ingredients: recipeIngredients,
+      limit: 3,
+    })
+      .then(res => {
+        if (!mounted) return;
+        // FastAPI returns { similar: [...] } — normalise both shapes
+        const recs = res.data?.similar || res.data?.recommendations || res.data || [];
+        setSimilar(Array.isArray(recs) ? recs : []);
+        setLoading(false);
+      })
+      .catch(err => {
+        if (!mounted) return;
+        setLoading(false);
+        // Silent fail for 503 (AI service down) — hide section entirely
+        if (err.response?.status !== 503) {
+          console.error('[RecommendationRow] error:', err.response?.data);
+        }
+        setSimilar([]);
+      });
+
     return () => { mounted = false; };
-  }, [recipeId]);
+  }, [recipeId]); // recipeId is a string — stable primitive dep, no infinite loop
 
   if (!loading && similar.length === 0) return null;
 
@@ -1080,12 +1094,17 @@ function RecipeList() {
                 )}
 
                 {/* Feature 3: Recommendations */}
-                <RecommendationRow recipeId={selectedRecipe._id} onSelectRecipe={async (id) => {
-                  try {
-                    const { data } = await API.get(`/api/recipes/${id}`);
-                    setSelectedRecipe(data);
-                  } catch { /* silently fail */ }
-                }} />
+                <RecommendationRow
+                  recipeId={selectedRecipe._id}
+                  recipeTitle={selectedRecipe.title}
+                  recipeIngredients={selectedRecipe.ingredients}
+                  onSelectRecipe={async (id) => {
+                    try {
+                      const { data } = await API.get(`/api/recipes/${id}`);
+                      setSelectedRecipe(data);
+                    } catch { /* silently fail */ }
+                  }}
+                />
               </div>
             </div>
           </div>
