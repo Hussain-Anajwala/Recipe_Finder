@@ -136,91 +136,7 @@ const TagReportModal = ({ recipeId, tag, onClose, onSuccess }) => {
   );
 };
 
-// ── Recommendation Row ─────────────────────────────────────────
-const RecommendationRow = ({ recipeId, recipeTitle, recipeIngredients, onSelectRecipe }) => {
-  const [similar, setSimilar] = useState([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!recipeId) return;
-    let mounted = true;
-    setSimilar([]);
-    setLoading(true);
-
-    API.post('/api/ai/recommend', {
-      recipe_id: recipeId,
-      title: recipeTitle,
-      ingredients: recipeIngredients,
-      limit: 3,
-    })
-      .then(res => {
-        if (!mounted) return;
-        // FastAPI returns { similar: [...] } — normalise both shapes
-        const recs = res.data?.similar || res.data?.recommendations || res.data || [];
-        setSimilar(Array.isArray(recs) ? recs : []);
-        setLoading(false);
-      })
-      .catch(err => {
-        if (!mounted) return;
-        setLoading(false);
-        // Silent fail for 503 (AI service down) — hide section entirely
-        if (err.response?.status !== 503) {
-          console.error('[RecommendationRow] error:', err.response?.data);
-        }
-        setSimilar([]);
-      });
-
-    return () => { mounted = false; };
-  }, [recipeId]); // recipeId is a string — stable primitive dep, no infinite loop
-
-  if (!loading && similar.length === 0) return null;
-
-  return (
-    <div className="mt-8 pt-8 border-t border-outline-variant/20">
-      <div className="flex items-center gap-2 mb-1">
-        <span className="material-symbols-outlined text-primary" style={{ fontSize: '18px' }}>auto_awesome</span>
-        <h4 className="font-headline text-xl text-on-surface italic">You Might Also Enjoy</h4>
-      </div>
-      <p className="font-technical text-xs text-on-surface-variant mb-4">
-        Suggestions based on ingredient and flavor similarity — not your personal history or demographic data.
-      </p>
-      <div className="space-y-3">
-        {loading ? (
-          [1, 2, 3].map(i => (
-            <div key={i} className="flex gap-4 p-3 bg-surface-container-low border border-outline/10 animate-pulse">
-              <div className="w-16 h-16 bg-surface-container rounded-sm flex-shrink-0" />
-              <div className="flex-1 py-1">
-                <div className="h-4 bg-surface-container rounded w-3/4 mb-2" />
-                <div className="h-3 bg-surface-container rounded w-1/2" />
-              </div>
-            </div>
-          ))
-        ) : (
-          similar.map(rec => (
-            <div
-              key={rec.recipe_id}
-              onClick={() => onSelectRecipe(rec.recipe_id)}
-              className="flex gap-4 p-3 bg-surface-container-low hover:bg-surface-container cursor-pointer transition-colors border border-outline/10 group"
-              role="button"
-              tabIndex={0}
-              onKeyDown={e => e.key === 'Enter' && onSelectRecipe(rec.recipe_id)}
-            >
-              <div className="w-16 h-16 bg-surface-container flex items-center justify-center flex-shrink-0 rounded-sm overflow-hidden">
-                <span className="material-symbols-outlined text-outline" style={{ fontSize: '24px' }}>restaurant</span>
-              </div>
-              <div>
-                <p className="font-headline text-lg text-on-surface leading-tight group-hover:text-primary transition-colors">{rec.title}</p>
-                <p className="font-technical text-xs text-on-surface-variant uppercase tracking-wider mt-1">
-                  {rec.category && `${rec.category} · `}{Math.round((rec.similarity_score || 0) * 100)}% similar
-                </p>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    </div>
-  );
-};
 
 // ── Main Component ─────────────────────────────────────────────
 function RecipeList() {
@@ -234,6 +150,8 @@ function RecipeList() {
   const [recipes, setRecipes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedRecipe, setSelectedRecipe] = useState(null);
+  const [recommendations, setRecommendations] = useState([]);
+  const [recsLoading, setRecsLoading] = useState(false);
 
   // Original search state
   const [searchIngredients, setSearchIngredients] = useState('');
@@ -286,6 +204,55 @@ function RecipeList() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!selectedRecipe?._id) {
+      setRecommendations([]);
+      setRecsLoading(false);
+      return;
+    }
+
+    // AbortController prevents stale responses from wiping fresh data
+    const controller = new AbortController();
+    
+    setRecsLoading(true);
+    // Do NOT call setRecommendations([]) here — keep showing previous recs
+    // while new ones load to avoid flash of empty content
+
+    API.post('/api/ai/recommend', {
+      recipe_id: selectedRecipe._id,
+      title: selectedRecipe.title,
+      ingredients: selectedRecipe.ingredients,
+      limit: 3
+    })
+    .then(res => {
+      // If this effect was cleaned up (StrictMode double-run or 
+      // recipe changed mid-flight), ignore the result
+      if (controller.signal.aborted) return;
+      
+      const recs =
+        res.data?.similar ||
+        res.data?.recommendations ||
+        res.data?.results ||
+        (Array.isArray(res.data) ? res.data : []);
+
+      console.log('✅ Setting recommendations:', recs.length, 'items');
+      setRecommendations(Array.isArray(recs) ? recs : []);
+      setRecsLoading(false);
+    })
+    .catch(err => {
+      if (controller.signal.aborted) return;
+      console.error('❌ Recommendations error:', err.response?.status, err.response?.data);
+      setRecsLoading(false);
+      // Don't clear recommendations on error — keep showing previous ones
+    });
+
+    // Cleanup: abort on unmount or dependency change
+    return () => {
+      controller.abort();
+    };
+
+  }, [selectedRecipe?._id]); // Only re-run when the actual ID changes
 
   // ── Original ingredient search ─────────────────────────────
   const handleSearch = useCallback(async (e, customIngredients, customThreshold) => {
@@ -945,7 +912,7 @@ function RecipeList() {
           <div className="absolute inset-0 bg-neutral-900/60 backdrop-blur-sm"></div>
 
           <div
-            className="relative bg-surface-container-lowest editorial-shadow w-full max-w-4xl max-h-[90vh] overflow-y-auto flex flex-col md:flex-row z-10 animate-in fade-in zoom-in duration-300 overflow-hidden"
+            className="relative bg-surface-container-lowest editorial-shadow w-full max-w-4xl max-h-[90vh] overflow-y-auto modal-scroll-container flex flex-col md:flex-row z-10 animate-in fade-in zoom-in duration-300 overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
             <button
@@ -1094,17 +1061,83 @@ function RecipeList() {
                 )}
 
                 {/* Feature 3: Recommendations */}
-                <RecommendationRow
-                  recipeId={selectedRecipe._id}
-                  recipeTitle={selectedRecipe.title}
-                  recipeIngredients={selectedRecipe.ingredients}
-                  onSelectRecipe={async (id) => {
-                    try {
-                      const { data } = await API.get(`/api/recipes/${id}`);
-                      setSelectedRecipe(data);
-                    } catch { /* silently fail */ }
-                  }}
-                />
+                {recsLoading && (
+                  <div className="mt-8 pt-8 border-t border-outline/20">
+                    <h3 className="font-technical text-sm font-bold tracking-[0.2em] uppercase 
+                                   text-primary mb-6 flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[16px]">recommend</span>
+                      You Might Also Enjoy
+                    </h3>
+                    <div className="space-y-3">
+                      {[1,2,3].map(i => (
+                        <div key={i} className="flex gap-4 p-3 bg-surface-container-low 
+                                                border border-outline/10 animate-pulse">
+                          <div className="w-16 h-16 bg-surface-container rounded-sm flex-shrink-0"/>
+                          <div className="flex-1 space-y-2 py-1">
+                            <div className="h-4 bg-surface-container rounded w-3/4"/>
+                            <div className="h-3 bg-surface-container rounded w-1/2"/>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {!recsLoading && recommendations && recommendations.length > 0 && (
+                  <div className="mt-8 pt-8 border-t border-outline/20">
+                    <h3 className="font-technical text-sm font-bold tracking-[0.2em] uppercase 
+                                   text-primary mb-6 flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[16px]">recommend</span>
+                      You Might Also Enjoy
+                    </h3>
+                    <div className="space-y-3">
+                      {recommendations.map((rec, index) => (
+                        <div
+                          key={rec._id || rec.recipe_id || rec.id || index}
+                          onClick={() => {
+                            const recId = rec.recipe_id || rec._id || rec.id;
+                            const fullRecipe = recipes.find(r => r._id === recId);
+                            if (fullRecipe) {
+                              setSelectedRecipe({ ...fullRecipe, similarity_score: rec.similarity_score });
+                            } else {
+                              setSelectedRecipe(rec);
+                            }
+                            const modalContent = document.querySelector('.modal-scroll-container');
+                            if (modalContent) modalContent.scrollTop = 0;
+                          }}
+                          className="flex gap-4 p-3 bg-surface-container-low 
+                                     hover:bg-surface-container cursor-pointer 
+                                     transition-colors border border-outline/10 group"
+                        >
+                          <div className="w-16 h-16 bg-surface-container flex items-center justify-center flex-shrink-0 rounded-sm overflow-hidden">
+                            <span className="material-symbols-outlined text-outline" style={{ fontSize: '24px' }}>restaurant</span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-headline text-lg text-on-surface leading-tight 
+                                          group-hover:text-primary transition-colors truncate">
+                              {rec.title}
+                            </p>
+                            <p className="font-technical text-xs text-on-surface-variant 
+                                          uppercase tracking-wider mt-1">
+                              {rec.category || 'Recipe'} · {Math.round((rec.similarity_score || 0) * 100)}% Match
+                            </p>
+                            {rec.description && (
+                              <p className="font-body text-xs text-on-surface-variant mt-1 
+                                            line-clamp-1">
+                                {rec.description}
+                              </p>
+                            )}
+                          </div>
+                          <span className="material-symbols-outlined text-outline-variant 
+                                           group-hover:text-primary transition-colors self-center 
+                                           flex-shrink-0">
+                            chevron_right
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

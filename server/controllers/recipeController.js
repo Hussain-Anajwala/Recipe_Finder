@@ -197,7 +197,7 @@ export const editMyRecipe = async (req, res) => {
 // @route   GET /api/recipes/search?ingredients=chicken,tomato
 export const searchRecipesByIngredients = async (req, res) => {
   try {
-    const { ingredients } = req.query;
+    const { ingredients, threshold } = req.query;
 
     if (!ingredients) {
       return res.status(400).json({ message: 'Please provide ingredients to search' });
@@ -262,15 +262,22 @@ export const searchRecipesByIngredients = async (req, res) => {
       };
     });
 
-    // Return ALL matches — no threshold filter, sort best coverage first
-    recipesWithScore.sort((a, b) => b.matchPercentage - a.matchPercentage);
+    const thresholdValue = threshold ? parseInt(threshold, 10) : 0;
+    
+    // Filter by threshold
+    const filteredRecipes = recipesWithScore.filter(r => r.matchPercentage >= thresholdValue);
+    const hiddenCount = recipesWithScore.length - filteredRecipes.length;
 
-    console.log('[search] results after scoring:', recipesWithScore.length);
+    // Return filtered matches sorted best coverage first
+    filteredRecipes.sort((a, b) => b.matchPercentage - a.matchPercentage);
+
+    console.log('[search] results after scoring and filtering:', filteredRecipes.length);
 
     res.json({
       searchedIngredients: searchIngredients,
-      totalResults: recipesWithScore.length,
-      recipes: recipesWithScore,
+      totalResults: filteredRecipes.length,
+      hiddenByThreshold: hiddenCount,
+      recipes: filteredRecipes,
     });
 
   } catch (error) {
