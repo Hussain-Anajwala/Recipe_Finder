@@ -101,3 +101,10 @@ out/
 # Temporary folders
 tmp/
 temp/
+
+# AI Service
+ai_service/chroma_db/
+ai_service/__pycache__/
+ai_service/models/__pycache__/
+*.pt
+*.pyc
